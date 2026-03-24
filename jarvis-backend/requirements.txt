@@ -1,0 +1,11 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-dotenv==1.0.1
+groq==0.15.0
+huggingface-hub==0.27.1
+edge-tts==7.0.0
+chromadb==0.6.3
+duckduckgo-search==7.3.2
+python-multipart==0.0.20
+websockets==14.2
+aiofiles==24.1.0

@@ -1,0 +1,115 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+
+/* ─── Base ──────────────────────────────────────────────── */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: #050a14;
+  color: #e0f0ff;
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Radial Background Glow ────────────────────────────── */
+.bg-jarvis {
+  background: radial-gradient(
+      ellipse 80% 60% at 50% 110%,
+      rgba(0, 240, 255, 0.06) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 50% 0%,
+      rgba(0, 102, 255, 0.04) 0%,
+      transparent 60%
+    ),
+    #050a14;
+}
+
+/* ─── Status Text ───────────────────────────────────────── */
+.status-text {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(0, 240, 255, 0.7);
+}
+
+/* ─── Mic Ring Glow ─────────────────────────────────────── */
+.mic-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(0, 240, 255, 0.3);
+  pointer-events: none;
+}
+
+.mic-ring-active {
+  border-color: rgba(0, 240, 255, 0.7);
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.25), 0 0 80px rgba(0, 240, 255, 0.1);
+}
+
+/* ─── Ripple Effect ─────────────────────────────────────── */
+.ripple-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 240, 255, 0.4);
+  animation: ripple 2s ease-out infinite;
+}
+
+.ripple-ring:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.ripple-ring:nth-child(3) {
+  animation-delay: 1s;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+/* ─── Scrollbar ─────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.2);
+  border-radius: 999px;
+}
+
+/* ─── Transcript Fade ───────────────────────────────────── */
+.transcript-fade {
+  mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 20%,
+    black 80%,
+    transparent 100%
+  );
+}
