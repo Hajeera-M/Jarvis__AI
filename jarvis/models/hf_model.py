@@ -1,4 +1,4 @@
-from models.groq_model import think
+from jarvis.models.groq_model import think
 
 def generate(prompt: str, system_prompt: str = "", temperature: float = 0.7, max_new_tokens: int = 1024) -> str:
     """

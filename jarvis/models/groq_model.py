@@ -3,7 +3,7 @@ JARVIS — Groq Model Wrapper
 Handles reasoning/thinking calls via Groq API.
 """
 
-from config import GROQ_API_KEY, GROQ_REASONING_MODEL
+from jarvis.config import GROQ_API_KEY, GROQ_REASONING_MODEL
 import sys
 
 _groq_client = None

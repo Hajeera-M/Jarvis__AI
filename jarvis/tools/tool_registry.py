@@ -3,11 +3,12 @@ JARVIS — Tool Registry
 Maps string tool names to actual Python functions.
 """
 
-from tools.search_tool import search_web
-from tools.file_tool import read_file, write_file
-from tools.system_tool import get_system_info, open_url
-from tools.whatsapp_tool import send_whatsapp_message
-from tools.memory_tool import manage_memory
+from jarvis.tools.search_tool import search_web
+from jarvis.tools.file_tool import read_file, write_file
+from jarvis.tools.system_tool import get_system_info, open_url
+from jarvis.tools.whatsapp_tool import send_whatsapp_message
+from jarvis.tools.memory_tool import manage_memory
+
 
 def call_tool(tool_name: str, tool_input: str) -> str:
     """

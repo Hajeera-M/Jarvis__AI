@@ -9,7 +9,7 @@ import numpy as np
 import pyaudio
 import openwakeword
 from openwakeword.model import Model
-from config import WAKE_WORD
+from jarvis.config import WAKE_WORD
 
 # Initialize OpenWakeWord model
 try:

@@ -5,7 +5,7 @@ Provides basic file reading/writing sandboxed to a specific directory.
 
 import os
 import json
-from config import SANDBOX_DIR
+from jarvis.config import SANDBOX_DIR
 
 def _safe_path(filename: str) -> str:
     """Ensure the target path is inside the sandbox directory."""

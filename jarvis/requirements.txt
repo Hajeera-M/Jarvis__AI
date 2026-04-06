@@ -11,3 +11,9 @@ openwakeword==0.7.1
 onnxruntime==1.17.1
 tflite-runtime==2.14.0
 pywhatkit==5.4
+sqlalchemy==2.0.4
+langdetect==1.0.9
+requests>=2.31.0
+fastapi>=0.109.0
+uvicorn>=0.27.0
+firecrawl-py>=0.0.5

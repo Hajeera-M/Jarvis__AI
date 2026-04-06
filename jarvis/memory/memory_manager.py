@@ -3,7 +3,7 @@ JARVIS — Memory Manager
 High-level API for saving and retrieving conversation history.
 """
 
-from memory.postgres_db import execute_query, init_db
+from jarvis.memory.postgres_db import execute_query, init_db
 
 # Try to initialize the database on import
 _db_initialized = init_db()

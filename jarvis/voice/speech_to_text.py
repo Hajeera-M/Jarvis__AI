@@ -6,7 +6,7 @@ Uses SpeechRecognition to record audio and Groq Whisper to transcribe.
 import speech_recognition as sr
 import io
 import wave
-from config import GROQ_API_KEY, GROQ_WHISPER_MODEL
+from jarvis.config import GROQ_API_KEY, GROQ_WHISPER_MODEL
 
 # We'll initialize the Groq client lazily
 _groq_client = None
