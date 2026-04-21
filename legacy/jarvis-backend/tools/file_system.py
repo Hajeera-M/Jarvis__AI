@@ -1,5 +1,5 @@
 """
-JARVIS-X — File System Tool
+JARVIS — File System Tool
 Safe file operations within a sandboxed directory.
 """
 
@@ -64,3 +64,4 @@ async def list_files(path: str = ".") -> str:
         return f"Contents of {path}:\n" + "\n".join(formatted)
     except Exception as e:
         return f"Error listing directory: {str(e)}"
+

@@ -1,5 +1,5 @@
 """
-JARVIS-X — HuggingFace Client
+JARVIS — HuggingFace Client
 Handles text generation via HuggingFace Inference API.
 """
 
@@ -42,3 +42,4 @@ async def generate(prompt: str, system_prompt: str = "", temperature: float = 0.
     )
 
     return response.choices[0].message.content.strip()
+

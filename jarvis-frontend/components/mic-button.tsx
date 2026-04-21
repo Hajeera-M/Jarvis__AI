@@ -137,3 +137,4 @@ export function MicButton({ state, onClick }: MicButtonProps) {
         </button>
     );
 }
+

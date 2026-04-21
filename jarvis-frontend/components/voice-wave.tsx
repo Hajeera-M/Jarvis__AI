@@ -45,3 +45,4 @@ export function VoiceWave({ isActive, barCount = 24 }: VoiceWaveProps) {
         </div>
     );
 }
+

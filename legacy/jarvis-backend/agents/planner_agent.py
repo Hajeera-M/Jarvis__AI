@@ -1,12 +1,12 @@
 """
-JARVIS-X — Planner Agent
+JARVIS — Planner Agent
 Uses Groq LLM to analyze user requests and produce structured action plans.
 """
 
 import json
 from models.groq_client import think
 
-PLANNER_SYSTEM_PROMPT = """You are the Planning Module of JARVIS-X, an advanced autonomous AI assistant.
+PLANNER_SYSTEM_PROMPT = """You are the Planning Module of JARVIS, an advanced autonomous AI assistant.
 
 Your task is to analyze a user request and produce a structured execution plan.
 
@@ -72,3 +72,4 @@ async def plan(user_input: str, memory_context: str = "") -> dict:
         }
 
     return plan_data
+

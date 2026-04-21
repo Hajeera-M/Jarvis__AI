@@ -1,4 +1,4 @@
-# JARVIS-X AI Assistant 🎙️🛸
+# JARVIS AI Assistant 🎙️🛸
 
 A modular, multi-lingual, and local-first AI voice assistant integrated with Groq LLM and customized for responsive human-like interactions.
 
@@ -31,3 +31,4 @@ A modular, multi-lingual, and local-first AI voice assistant integrated with Gro
 
 ---
 *Created and maintained by Hajeera-M.*
+

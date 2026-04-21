@@ -1,12 +1,12 @@
 """
-JARVIS-X — Reflection Agent
+JARVIS — Reflection Agent
 Evaluates execution results and determines if the task is complete.
 """
 
 import json
 from models.groq_client import think
 
-REFLECTION_SYSTEM_PROMPT = """You are the Reflection Module of JARVIS-X.
+REFLECTION_SYSTEM_PROMPT = """You are the Reflection Module of JARVIS.
 
 Your task is to evaluate whether an AI assistant's response adequately addresses the user's request.
 
@@ -66,3 +66,4 @@ Evaluate if this response adequately addresses the user's request."""
         }
 
     return evaluation
+

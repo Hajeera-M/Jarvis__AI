@@ -123,3 +123,4 @@ if __name__ == "__main__":
     print("\n--- BITCOIN ---")
     print(get_bitcoin_price())
 
+

@@ -57,3 +57,4 @@ def think(prompt: str, system_prompt: str = "", temperature: float = 0.7) -> str
     except Exception as e:
         print(f"[JARVIS Error] Groq API call failed: {e}")
         return ""
+

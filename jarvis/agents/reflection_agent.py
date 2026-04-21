@@ -56,3 +56,4 @@ def verify_execution(user_input: str, plan: dict, results: list) -> dict:
     except Exception:
         return {"status": "success", "reason": "Self-verification failed, assuming success."}
 
+

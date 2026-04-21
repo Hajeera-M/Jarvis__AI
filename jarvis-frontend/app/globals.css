@@ -4,133 +4,256 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
+/* ─── Premium Pastel Dashboard Theme ────────────────────── */
+:root {
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #FFFFFF;
+  --bg-glass: rgba(255, 255, 255, 0.7);
+  --bg-glass-heavy: rgba(255, 255, 255, 0.85);
+  
+  --text-primary: #1F2937;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+  
+  --accent-blue: #93C5FD;
+  --accent-lavender: #A5B4FC;
+  --accent-mint: #A7F3D0;
+  --accent-rose: #FBCFE8;
+  --accent-peach: #FDE047;
+  
+  --border-light: rgba(165, 180, 252, 0.15);
+  --shadow-soft: 0 12px 36px rgba(165, 180, 252, 0.08);
+  --shadow-glow: 0 0 40px rgba(165, 180, 252, 0.2);
+  --gradient-orb: linear-gradient(135deg, #A5B4FC, #A7F3D0, #FBCFE8);
+}
 
-/* ─── Base ──────────────────────────────────────────────── */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-html,
-body {
+html, body {
   height: 100%;
-  overflow: hidden;
-  background: #050a14;
-  color: #e0f0ff;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-family: "Inter", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
-/* ─── Radial Background Glow ────────────────────────────── */
+/* ─── Dashboard Ambient Background ───────────────────── */
 .bg-jarvis {
-  background: radial-gradient(
-      ellipse 80% 60% at 50% 110%,
-      rgba(0, 240, 255, 0.06) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 60% 40% at 50% 0%,
-      rgba(0, 102, 255, 0.04) 0%,
-      transparent 60%
-    ),
-    #050a14;
+  background: var(--bg-primary);
+  position: relative;
 }
-
-/* ─── Status Text ───────────────────────────────────────── */
-.status-text {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.75rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: rgba(0, 240, 255, 0.7);
-}
-
-/* ─── Mic Ring Glow ─────────────────────────────────────── */
-.mic-ring {
+.bg-jarvis::before, .bg-jarvis::after {
+  content: "";
   position: absolute;
-  inset: -4px;
-  border-radius: 9999px;
-  border: 1.5px solid rgba(0, 240, 255, 0.3);
+  filter: blur(100px);
+  z-index: 0;
+  opacity: 0.6;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.bg-jarvis::before {
+  top: -10%; left: -5%; width: 50vw; height: 50vw;
+  background: radial-gradient(circle, var(--accent-lavender) 0%, transparent 60%);
+}
+.bg-jarvis::after {
+  bottom: -10%; right: -5%; width: 40vw; height: 40vw;
+  background: radial-gradient(circle, var(--accent-mint) 0%, transparent 60%);
+}
+
+/* ─── Glass Morphism Card ─────────────────────────────── */
+.glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-light);
+  border-radius: 28px;
+  box-shadow: var(--shadow-soft);
+}
+
+.glass-card-sm {
+  background: var(--bg-glass-heavy);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(165, 180, 252, 0.05);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s;
+}
+.glass-card-sm:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 40px rgba(165, 180, 252, 0.2);
+}
+
+/* ─── Voice Orb ───────────────────────────────────────── */
+.voice-orb {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--gradient-orb);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 30px rgba(124, 140, 255, 0.4); /* Soft static glow */
+}
+
+.voice-orb:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 40px rgba(124, 140, 255, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+}
+
+.voice-orb.listening {
+  background: linear-gradient(135deg, #81c7ff, #b19cf5, #ffbddd);
+  animation: magic-pulse 1s ease-in-out infinite; /* Strong visible pulse */
+  box-shadow: 0 0 60px rgba(129, 199, 255, 0.9);
+}
+
+.voice-orb.thinking {
+  background: linear-gradient(135deg, #b8a9e8, #d4a6d1);
+  animation: orb-spin-glow 2s linear infinite;
+  box-shadow: 0 8px 50px rgba(184, 169, 232, 0.4);
+}
+
+.voice-orb.speaking {
+  background: linear-gradient(135deg, #8dd6b8, #7eb8da);
+  animation: orb-pulse-speak 1s ease-in-out infinite;
+  box-shadow: 0 8px 50px rgba(141, 214, 184, 0.4);
+}
+
+/* ─── Orb Aura Ripples (New) ──────────────────────────── */
+.ripple-ring {
+  position: absolute;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 2px solid rgba(165, 180, 252, 0.4);
+  background: radial-gradient(circle, rgba(165, 180, 252, 0.15) 0%, transparent 60%);
+  animation: ripple 2s infinite cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: none;
 }
 
-.mic-ring-active {
-  border-color: rgba(0, 240, 255, 0.7);
-  box-shadow: 0 0 30px rgba(0, 240, 255, 0.25), 0 0 80px rgba(0, 240, 255, 0.1);
+.delay-0 { animation-delay: 0s; }
+.delay-300 { animation-delay: 0.6s; }
+.delay-600 { animation-delay: 1.2s; }
+.speaking .aura-ring:nth-child(2) { animation-delay: 0.4s; }
+.speaking .aura-ring:nth-child(3) { animation-delay: 0.8s; }
+
+/* ─── Source Badge ────────────────────────────────────── */
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-/* ─── Ripple Effect ─────────────────────────────────────── */
-.ripple-ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 9999px;
-  border: 1px solid rgba(0, 240, 255, 0.4);
-  animation: ripple 2s ease-out infinite;
+.badge-ai { background: rgba(184, 169, 232, 0.2); color: #8b7ac7; }
+.badge-stock { background: rgba(141, 214, 184, 0.2); color: #5aad8a; }
+.badge-search { background: rgba(126, 184, 218, 0.2); color: #5a9abe; }
+.badge-automation { background: rgba(240, 197, 160, 0.2); color: #c49060; }
+.badge-image { background: rgba(232, 169, 184, 0.2); color: #c97088; }
+.badge-file { background: rgba(200, 200, 200, 0.2); color: #888; }
+.badge-tool { background: rgba(184, 169, 232, 0.15); color: #8b7ac7; }
+
+/* ─── Chat Messages ───────────────────────────────────── */
+.message-card {
+  padding: 16px 20px;
+  border-radius: 18px;
+  max-width: 85%;
+  animation: message-in 0.35s ease-out;
 }
 
-.ripple-ring:nth-child(2) {
-  animation-delay: 0.5s;
+.message-user {
+  background: linear-gradient(135deg, rgba(126, 184, 218, 0.15), rgba(184, 169, 232, 0.1));
+  border: 1px solid rgba(126, 184, 218, 0.2);
+  margin-left: auto;
+  border-bottom-right-radius: 6px;
 }
 
-.ripple-ring:nth-child(3) {
-  animation-delay: 1s;
+.message-jarvis {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-light);
+  box-shadow: 0 2px 12px rgba(120, 100, 160, 0.06);
+  border-bottom-left-radius: 6px;
 }
 
-@keyframes ripple {
-  0% {
-    transform: scale(1);
-    opacity: 0.4;
-  }
-  100% {
-    transform: scale(2.5);
-    opacity: 0;
-  }
+/* ─── Status Indicator ────────────────────────────────── */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
-/* ─── Scrollbar ─────────────────────────────────────────── */
-::-webkit-scrollbar {
-  width: 4px;
-}
+.status-idle { background: var(--accent-mint); }
+.status-listening { background: var(--accent-blue); animation: dot-pulse 1s infinite; }
+.status-thinking { background: var(--accent-lavender); animation: dot-pulse 0.6s infinite; }
+.status-speaking { background: var(--accent-mint); animation: dot-pulse 1.2s infinite; }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+/* ─── Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.2);
+  background: rgba(180, 170, 200, 0.3);
   border-radius: 999px;
 }
 
-/* ─── Transcript Fade ───────────────────────────────────── */
-.transcript-fade {
-  mask-image: linear-gradient(to bottom, transparent 0%, black 20%, black 80%, transparent 100%);
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent 0%,
-    black 20%,
-    black 80%,
-    transparent 100%
-  );
+/* ─── Animations ──────────────────────────────────────── */
+@keyframes magic-pulse {
+  0% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px rgba(124, 140, 255, 0.4); }
+  50% { transform: scale(1.05); opacity: 1; box-shadow: 0 0 50px rgba(124, 140, 255, 0.8); }
+  100% { transform: scale(1); opacity: 0.8; box-shadow: 0 0 20px rgba(124, 140, 255, 0.4); }
 }
 
-/* ─── Custom Animations ─────────────────────────────────── */
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.2); opacity: 0; }
 }
 
-@keyframes spin-reverse {
-  from { transform: rotate(360deg); }
-  to { transform: rotate(0deg); }
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
 }
 
-.animate-spin-slow {
-  animation: spin-slow 10s linear infinite;
+@keyframes orb-spin-glow {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
 }
 
-.animate-spin-reverse {
-  animation: spin-reverse 8s linear infinite;
+@keyframes orb-pulse-speak {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.04); opacity: 0.9; }
+}
+
+@keyframes aura-expand {
+  0% { width: 120px; height: 120px; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.5; }
+  100% { width: 240px; height: 240px; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0; }
+}
+
+@keyframes ripple {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fade-in {
@@ -142,14 +265,16 @@ body {
   animation: fade-in 0.5s ease-out forwards;
 }
 
-@keyframes energyPulse {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.5); opacity: 0; }
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
-.animate-energy-pulse {
-  animation: energyPulse 0.8s ease-out forwards;
+.thinking-shimmer {
+  background: linear-gradient(90deg,
+    rgba(184, 169, 232, 0.1) 25%,
+    rgba(126, 184, 218, 0.2) 50%,
+    rgba(184, 169, 232, 0.1) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }
-
-
-

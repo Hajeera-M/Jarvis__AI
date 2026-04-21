@@ -1,5 +1,5 @@
 """
-JARVIS-X — Text-to-Speech
+JARVIS — Text-to-Speech
 Uses edge-tts for high-quality speech synthesis.
 """
 
@@ -34,3 +34,4 @@ async def synthesize_speech(text: str) -> bytes:
             audio_buffer.write(chunk["data"])
 
     return audio_buffer.getvalue()
+

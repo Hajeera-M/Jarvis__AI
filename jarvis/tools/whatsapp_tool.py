@@ -33,3 +33,4 @@ def send_whatsapp_message(contact_info: str, message: str) -> str:
         return f"Successfully sent WhatsApp message to {phone_number}."
     except Exception as e:
         return f"Failed to send WhatsApp message: {e}"
+

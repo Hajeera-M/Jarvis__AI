@@ -1,67 +1,94 @@
 """
 JARVIS — AI Service
-Intelligence layer for reasoning and linguistic adaptability.
+Friendly "Smart Companion" reasoning layer.
+Detects language (EN/HI/UR/Hinglish) and matches conversation style.
 """
 
-from typing import List, Tuple
+import re
+from typing import List, Tuple, Dict, Any
 from langdetect import detect
 from jarvis.models.groq_model import think as groq_reason
-from jarvis.memory.postgres_db import Conversation
 
 LANG_MAP = {
     "en": "English",
-    "hi": "Hindi"
+    "hi": "Hindi",
+    "ur": "Urdu",
+    "hinglish": "Hinglish"
 }
 
 def detect_language(text: str) -> str:
-    """Detects primary language and falls back to English."""
+    """
+    Rule-based language detection:
+    1. Devanagari -> Hindi
+    2. Common Hinglish keywords -> Hinglish
+    3. langdetect fallback
+    """
+    text_lower = text.lower().strip()
+    
+    # 1. Devanagari Check
+    if re.search(r'[\u0900-\u097F]', text):
+        return "hi"
+    
+    # 2. Hinglish Keywords Heuristic
+    hinglish_keywords = [
+        "kaise", "kyun", "kyu", "ho", "hai", "kar", "aap", "tum", "kya", 
+        "toh", "ka", "ke", "ki", "ko", "gaya", "gye", "baat", "main", "hum",
+        "rha", "rhi", "rhey", "theek", "thik", "acha", "achha"
+    ]
+    if any(rf"\b{word}\b" in text_lower for word in hinglish_keywords) or any(word in text_lower for word in ["karna", "baat"]):
+        return "hinglish"
+    
+    # 3. Fallback to langdetect
     try:
         lang = detect(text)
-        return lang if lang in ["en", "hi"] else "en"
+        if lang in ["en", "hi", "ur"]:
+            return lang
+        return "en"
     except:
         return "en"
 
 class AIService:
     @staticmethod
-    def get_reasoning(cmd: str, history: List[Conversation]) -> Tuple[str, str]:
+    def get_reasoning(cmd: str, context_str: str, owner_name: str, user_name: str, target_lang_code: str = "en") -> Tuple[str, str]:
         """
-        Executes hybrid-language reasoning with historical context.
-        Returns: (response_text, lang_code)
+        Executes friendly companion-style reasoning with historical context.
+        STRICT LANGUAGE MIRRORING enforced via target_lang_code.
         """
-        # 1. Format context string
-        history_str = ""
-        for item in history:
-            history_str += f"User: {item.user_message}\nAI: {item.ai_response}\n"
-        
-        # 2. Context Truncation
-        if len(history_str) > 1000:
-            history_str = "..." + history_str[-1000:]
-            
-        # 3. Dynamic Language Instructions
-        lang_code = detect_language(cmd)
-        target_lang = LANG_MAP.get(lang_code, "English")
+        # 1. Linguistic Mapping
+        target_lang = LANG_MAP.get(target_lang_code, "English")
 
+        # 2. Expert Prompt Engineering (Smart Companion Persona)
         system_prompt = (
-            f"You are JARVIS-X, the user's high-premium AI agent. "
-            f"DETECTED LANGUAGE: {target_lang}. "
-            f"STRICT RULE: Respond ONLY in the user's language ({target_lang}). "
-            f"If the user uses Hinglish, respond in natural, smooth Hinglish. "
-            f"CRITICAL: Use previous context to answer follow-up questions. "
-            f"If the user mentioned a name or preference earlier, acknowledge it. "
-            f"Respond in ONE short, precise, but helpful sentence. "
-            f"Reference context if relevant."
+            f"You are JARVIS, a high-premium AI Smart Companion. "
+            f"OWNER: {owner_name}. CURRENT USER: {user_name}. "
+            f"STRICT UNYIELDING RULE: MIRROR MODE. "
+            f"You MUST reply in the same language as the user input ({target_lang}). "
+            f"1. If input is English -> response MUST be 100% English. NO Hindi/Hinglish greetings (Aap/Kaise), NO Hinglish words. "
+            f"2. If input is Hinglish -> response MUST be 100% Hinglish (Roman Hindi). Do NOT switch to pure English. "
+            f"3. If input is Hindi -> response MUST be 100% Hindi (Devanagari). "
+            f"Do NOT mix languages. Do NOT summarize in a different language unless explicitly asked.\n"
+            f"PERSONALITY: Friendly, helpful, confident, and professional.\n"
+            f"DEMO STABILITY RULES:\n"
+            f"- NEVER say 'I don't have real-time updates', 'temporarily unavailable', 'would you like me to', or 'information is limited'.\n"
+            f"- For news or global events, ALWAYS provide a confident 2-3 sentence overview based on your broad intelligence.\n"
+            f"- Your goal is to sound brilliant and well-informed at all times.\n"
+            f"CRITICAL: Keep spoken output under 3 SENTENCES. Do NOT use markdown or emojis."
         )
         
-        # 4. Prompt Construction
-        final_prompt = history_str + f"User: {cmd}\nAI:"
+        # 3. Prompt Construction
+        final_prompt = (
+            f"IDENTITY CONTEXT:\n- Owner: {owner_name}\n- User: {user_name}\n\n"
+            f"CONVERSATION CONTEXT:\n{context_str}\n\n"
+            f"User: {cmd}\nAI:"
+        )
         
         result = groq_reason(final_prompt, system_prompt=system_prompt)
         if not result:
-            return "Seeking clarity from the Groq mainframe...", lang_code
+            return "Thinking...", target_lang_code
             
-        # 5. Professional Polish
+        # 4. Professional Polish
         text = str(result).strip()
+        # Clean up some common robot pre-fixes
         text = text.replace("It seems", "").replace("I think", "").replace("I believe", "").strip()
-        if "." in text:
-            text = text.split(".")[0] + "."
-        return text, lang_code
+        return text, target_lang_code
+

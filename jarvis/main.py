@@ -5,6 +5,8 @@ Runs the primary Voice AI loop with real-time speech interrupt.
 
 import sys
 import threading
+import os
+import json
 
 from jarvis.config import WAKE_WORD
 from jarvis.voice.speech_to_text import listen_and_transcribe
@@ -13,11 +15,9 @@ from jarvis.voice.text_to_speech import speak, speak_async, stop_speaking, is_sp
 from jarvis.agents.controller import MasterController
 from jarvis.memory.postgres_db import init_db
 
-
-
 def main():
     print("=" * 50)
-    print("           JARVIS-X LOCAL AGENT STARTED           ")
+    print("           JARVIS LOCAL AGENT STARTED           ")
     print("=" * 50)
     print(f"Wake word: '{WAKE_WORD}'")
     print("Say 'exit' or press Ctrl+C to stop.")
@@ -25,16 +25,15 @@ def main():
     
     init_db()
 
-    # Startup greeting (blocking — waits until done)
-    speak("JARVIS initialized. All systems are operational. How can I assist you?")
+    # Startup greeting (Natural Speech)
+    speak("JARVIS initialized. Hello Hajeera, how can I help you?")
 
-    # State Memory for Contextual Understanding
-    context = {"intent": None, "entity": None, "entities": {}, "active_intents": set(), "last_skill": None}
-    image_mode = False
+    # State Context
+    context = {"intent": None, "entities": {}, "active_intents": set(), "last_skill": None}
 
     try:
         while True:
-            # Listen continuously (this blocks until speech is detected)
+            # 1. Continuous Listen (Local/Frontend integration)
             command = listen_and_transcribe()
 
             if not command:
@@ -42,36 +41,40 @@ def main():
 
             command_low = command.lower()
 
-            # ── INTERRUPT: if speaking and user says stop ──
-            if is_speaking and any(w in command_low for w in ["stop", "wait", "jarvis stop", "quiet"]):
+            # 2. INTERRUPT: if speaking and user says stop ──
+            if is_speaking and any(w in command_low for w in ["stop", "wait", "jarvis stop", "quiet", "chup"]):
                 stop_speaking()
                 print("[JARVIS] Speech interrupted by user.")
                 continue
 
-            # Any new command also interrupts current speech
             stop_speaking()
 
-            # 1. EXIT CHECK
+            # 3. EXIT CHECK
             if any(word in command_low for word in ["exit", "quit", "goodbye"]):
                 speak("Goodbye.")
                 break
 
-            # 2. WAKE WORD CHECK
+            # 4. WAKE WORD CHECK
             if command_low.startswith(WAKE_WORD.lower()):
-                speak("Yes?")
+                speak("Yes Hajeera?")
                 continue
 
-            # 3. SEND TO SKILLS SYSTEM (with persistent user_id) using Agent Controller
-            output, updated_context = MasterController.handle_user_input(command, context, user_id="local_user")
-            
-            response = output.get("response")
-            source = output.get("source")
+            # 5. AGENT ORCHESTRATION (MasterController)
+            output, updated_context = MasterController.handle_user_input(
+                command, context, user_id="local_user"
+            )
 
             # Update States
             context = updated_context
+            
+            response = output.get("response")
+            spoken_response = output.get("spoken_response")
+            lang = output.get("language", "en")
+            source = output.get("source")
 
-            if response:
-                speak_async(response)  # Non-blocking: JARVIS speaks while still listening
+            if spoken_response:
+                print(f"[JARVIS ({source})] Spoken: {spoken_response}")
+                speak_async(spoken_response, lang=lang) # Non-blocking speech
 
     except KeyboardInterrupt:
         print("\n[JARVIS] Shutting down...")
@@ -81,6 +84,6 @@ def main():
         print("\n[JARVIS] Offline.")
         sys.exit(0)
 
-
 if __name__ == "__main__":
     main()
+

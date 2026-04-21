@@ -1,5 +1,5 @@
 """
-JARVIS-X — Web Search Tool
+JARVIS — Web Search Tool
 Uses DuckDuckGo for free web search.
 """
 
@@ -35,3 +35,4 @@ async def search(query: str, max_results: int = 5) -> str:
 
     except Exception as e:
         return f"Search error: {str(e)}"
+

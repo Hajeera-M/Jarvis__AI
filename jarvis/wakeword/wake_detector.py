@@ -71,3 +71,4 @@ def wait_for_wake_word():
             audio_stream.close()
         if pa is not None:
             pa.terminate()
+

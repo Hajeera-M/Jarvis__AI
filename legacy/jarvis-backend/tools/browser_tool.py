@@ -1,5 +1,5 @@
 """
-JARVIS-X — Browser Tool
+JARVIS — Browser Tool
 Opens URLs in the default system browser.
 """
 
@@ -24,3 +24,4 @@ async def open_url(url: str) -> str:
         return f"Opened {url} in browser"
     except Exception as e:
         return f"Failed to open URL: {str(e)}"
+

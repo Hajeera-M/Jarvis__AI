@@ -1,39 +1,78 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import Particles from "react-tsparticles";
-import { loadSlim } from "tsparticles-slim";
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { AssistantHeader } from "./components/AssistantHeader";
+import { ChatMessage } from "./components/ChatMessage";
+import { VoiceOrb } from "./components/VoiceOrb";
+import { MetricsSidebar } from "./components/MetricsSidebar";
+import { ChatInput } from "./components/ChatInput";
+import { SettingsModal } from "./components/SettingsModal";
+import { HistoryModal } from "./components/HistoryModal";
+import { initVoices, getPreferredVoice } from "../lib/voiceHelper";
+
+interface ChatMessageObj {
+  role: "user" | "jarvis";
+  text: string;
+  source?: string;
+  imageUrl?: string;
+  status?: "success" | "failed";
+  timestamp: Date;
+}
 
 export default function Home() {
-  // state: "idle" | "listening" | "thinking" | "speaking" | "completed"
-  const [state, setState] = useState("idle");
-  const [response, setResponse] = useState("");
+  const [state, setState] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
+  const [messages, setMessages] = useState<ChatMessageObj[]>([]);
+  const [textInput, setTextInput] = useState("");
+  const [imageUrl, setImageUrl] = useState(""); // Kept for state compatibility
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const particlesInit = useCallback(async (engine: any) => {
-    await loadSlim(engine);
+  // Modal States
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    const savedMessages = localStorage.getItem("jarvis_messages");
+    if (savedMessages) {
+      try {
+        const parsed = JSON.parse(savedMessages);
+        const hydrated = parsed.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp)
+        }));
+        setMessages(hydrated);
+      } catch (e) {
+        console.error("Failed to load history:", e);
+      }
+    }
   }, []);
 
-  // Simple Synthesizer Beep for Mic Feedback
-  const playBeep = () => {
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // high pitch beep
-      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // volume
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.1);
-
-      oscillator.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      oscillator.start();
-      oscillator.stop(audioCtx.currentTime + 0.1);
-    } catch {
-      // Ignore if audio isn't supported or allowed yet
+  useEffect(() => {
+    if (messages.length > 0) {
+      localStorage.setItem("jarvis_messages", JSON.stringify(messages));
     }
-  };
+  }, [messages]);
 
+  // ─── Auth Guard ────────────────────────────────────────
+  const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+  useEffect(() => {
+    const user = localStorage.getItem("jarvis_user");
+    if (!user) {
+      router.replace("/signin");
+    } else {
+      setAuthChecked(true);
+    }
+    // Initialize voices
+    initVoices();
+  }, [router]);
+
+  // ─── API Call ───────────────────────────────────────────
   async function sendToJarvis(text: string) {
     try {
       const res = await fetch("http://127.0.0.1:8000/jarvis", {
@@ -41,199 +80,254 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: text }),
       });
-      const data = await res.json();
-      console.log("JARVIS API Reply:", data);
-      
-      // Defensive check: handle different response keys or raw strings
-      return data.response || data.message || (typeof data === 'string' ? data : JSON.stringify(data));
-
+      return await res.json();
     } catch (e) {
-      console.error(e);
-      throw e;
+      console.error("JARVIS API Error:", e);
+      return { response: "Connection lost. Please try again.", status: "failed", source: "error" };
     }
   }
 
-  // Real Sequence: Click -> Recording -> Fetching -> TTS -> Idle
+  // ─── Process a query (shared by voice + text) ──────────
+  async function processQuery(text: string) {
+    if (!text.trim()) return;
+    // Add user message
+    setMessages((prev) => [...prev, { role: "user", text, timestamp: new Date() }]);
+    setState("thinking");
+    setImageUrl("");
+
+    const data = await sendToJarvis(text);
+    const reply = data.response || data.message || "No response received.";
+    const spokenReply = data.spoken_response || reply;
+    const source = data.source || "ai";
+    const imgUrl = data.image_url || "";
+    const status = data.status || "success";
+
+    // Add JARVIS message
+    setMessages((prev) => [
+      ...prev,
+      { role: "jarvis", text: reply, source, imageUrl: imgUrl, status, timestamp: new Date() },
+    ]);
+    setImageUrl(imgUrl);
+
+    // ─── TTS Stability Hardening ───────────────────────────
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel(); // Interrupt any ongoing speech immediately
+      
+      const speechText = data.spoken_response || reply; // Ensure full text source
+      const utterance = new SpeechSynthesisUtterance(speechText);
+      
+      utterance.rate = 0.95; // Slightly slower for better professional clarity
+      utterance.pitch = 1.0;  // Natural pitch anchor
+      
+      const picked = getPreferredVoice(data.language || "en");
+      if (picked) utterance.voice = picked;
+      
+      utterance.onend = () => setState("idle");
+      utterance.onerror = () => setState("idle");
+
+      setState("speaking");
+      // 200ms buffer delay allows the browser audio context to stabilize
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+      }, 200);
+    } else {
+      setTimeout(() => setState("idle"), 2000);
+    }
+  }
+
+  // ─── Voice Mic Handler ─────────────────────────────────
   const handleMicClick = () => {
-    if (state !== "idle") return; // Prevent clicking while active
-    
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    // Instant interrupt
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (state === "speaking") {
+      setState("idle");
+      return;
+    }
+    if (state !== "idle") return;
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+      alert("Speech recognition is not supported. Use Chrome or Edge.");
       return;
     }
 
     const recognition = new SpeechRecognition();
     recognition.lang = "en-US";
-
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
-    // INSTANT CONFIDENCE: Change UI immediately
     setState("listening");
-    setResponse("Listening...");
-    playBeep();
 
     recognition.onresult = async (event: any) => {
-      const text = event.results[0][0].transcript;
-      setState("thinking");
-      setResponse(`"${text}" ... processing.`);
-      
-      // Safety Fallback: Let user know the backend isn't dead
-      const thinkingTimeout = setTimeout(() => {
-        setResponse("Still processing... JARVIS is thinking.");
-      }, 5000);
-
-      try {
-        const backendResponse = await sendToJarvis(text);
-
-        clearTimeout(thinkingTimeout); // Clear fallback
-        setResponse(backendResponse);
-        setState("speaking");
-
-        speechSynthesis.cancel(); // Prevent overlapping audio bug
-        const speech = new SpeechSynthesisUtterance(backendResponse);
-        
-        speech.onend = () => {
-          setState("completed"); // Trigger the energy pulse
-          setTimeout(() => {
-             setState("idle");
-          }, 800);
-        };
-        
-        speechSynthesis.speak(speech);
-
-      } catch (e) {
-        clearTimeout(thinkingTimeout); // Clear fallback
-        setResponse("Connection lost. Please try again.");
-        setTimeout(() => setState("idle"), 3000);
-      }
+      const transcript = event.results[0][0].transcript;
+      processQuery(transcript);
     };
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech error", event);
-      setResponse("Microphone resting.");
-      setTimeout(() => setState("idle"), 1500);
+    recognition.onerror = () => {
+      setState("idle");
     };
 
     recognition.onend = () => {
-      // If recognition ends abruptly without entering thinking phase
-      setState((prevState) => {
-        if (prevState === "listening") {
-          setResponse("No speech detected.");
-          setTimeout(() => setState("idle"), 1500);
-          return "idle"; 
-        }
-        return prevState;
-      });
+      setState((prev) => (prev === "listening" ? "idle" : prev));
     };
 
-    recognition.onspeechend = () => {
-        recognition.stop();
-    };
-
+    recognition.onspeechend = () => recognition.stop();
     recognition.start();
   };
 
+  // ─── Text Submit ───────────────────────────────────────
+  const handleTextSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!textInput.trim() || state !== "idle") return;
+    processQuery(textInput.trim());
+    setTextInput("");
+  };
+
+  // ─── Stop Speaking ─────────────────────────────────────
+  const handleStop = () => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setState("idle");
+  };
+
+  // ─── Clear Chat ────────────────────────────────────────
+  const handleClear = () => {
+    setMessages([]);
+    localStorage.removeItem("jarvis_messages");
+    setImageUrl("");
+    setState("idle");
+  };
+
+  const sendPredefinedText = (text: string) => {
+    if (state !== "idle") return;
+    processQuery(text);
+  };
+
+  // Metrics Logic
+  const jarvisMessages = messages.filter((m) => m.role === "jarvis").length;
+  const jarvisImages = messages.filter((m) => m.imageUrl && m.imageUrl !== "").length;
+
+  // Prevent flash of dashboard before redirect
+  if (!authChecked) return null;
 
   return (
-    <div className="h-screen bg-black flex flex-col items-center justify-center text-white relative overflow-hidden">
+    <div className="bg-jarvis min-h-screen flex justify-center p-4 lg:p-8">
       
-      {/* Background Particles - Subtle and elegant */}
-      <Particles
-        id="tsparticles"
-        init={particlesInit}
-        options={{
-          background: { color: { value: "transparent" } },
-          fpsLimit: 60,
-          particles: {
-            color: { value: "#00f0ff" },
-            links: {
-              color: "#00f0ff",
-              distance: 150,
-              enable: true,
-              opacity: 0.15,
-              width: 1,
-            },
-            move: {
-              enable: true,
-              speed: 0.3,
-              direction: "none",
-              random: true,
-              outModes: { default: "out" },
-            },
-            number: { density: { enable: true, area: 800 }, value: 40 },
-            opacity: { value: 0.2 },
-            shape: { type: "circle" },
-            size: { value: { min: 1, max: 2 } },
-          },
-          detectRetina: true,
-        }}
-        className="absolute inset-0 z-0 pointer-events-none"
-      />
+      {/* Front-End Only Modals */}
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onClearMemory={handleClear} />
+      <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} messages={messages} />
 
-      {/* Title */}
-      <h1 className="text-cyan-400 text-xl font-light mb-12 tracking-[0.3em] z-10 opacity-80">
-        JARVIS-X CORE
-      </h1>
+      {/* Structural constraint container */}
+      <div className="w-full max-w-7xl h-[calc(100vh-4rem)] flex gap-6">
+        
+        {/* Left/Center Panel: Main Interaction Area */}
+        <div className="flex-1 flex flex-col h-full relative border border-indigo-50/50 rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(165,180,252,0.1)]">
+          <div className="absolute inset-0 bg-white/40 backdrop-blur-3xl z-0 pointer-events-none"></div>
+          
+          <AssistantHeader state={state} />
 
-      {/* Outer Rotating Ring Assembly */}
-      <div className="relative flex items-center justify-center z-10 my-4">
+          {/* Main Chat Feed */}
+          <main className="flex-1 flex flex-col overflow-hidden relative z-10 w-full max-w-3xl mx-auto h-full">
+            
+            <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 space-y-2 relative custom-scrollbar">
+              
+              {messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full opacity-60 gap-4 pt-4 animate-fade-in text-center">
+                  <div className="text-5xl drop-shadow-sm mb-2" style={{color: "var(--accent-lavender)"}}>✧</div>
+                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-700">How can I help you today?</h2>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-indigo-300">
+                    Voice • Image • Search • Stock
+                  </p>
+                </div>
+              )}
 
-        {/* Ring 1 - Outer (Balanced Speed) */}
-        <div className={`absolute border rounded-full transition-all duration-700 opacity-30 ${
-          state === "thinking" 
-            ? "w-80 h-80 animate-[spin_4s_linear_infinite] border-purple-500 scale-105" 
-            : "w-72 h-72 animate-[spin_12s_linear_infinite] border-cyan-400"
-        }`}></div>
+              {/* Render Messages */}
+              {messages.map((msg, i) => (
+                <ChatMessage key={i} msg={msg} />
+              ))}
 
-        {/* Ring 2 - Inner (Balanced Speed) */}
-        <div className={`absolute border rounded-full transition-all duration-700 opacity-30 ${
-          state === "thinking" 
-            ? "w-64 h-64 animate-[spin-reverse_3s_linear_infinite] border-cyan-400 scale-95" 
-            : "w-56 h-56 animate-[spin-reverse_10s_linear_infinite] border-purple-500"
-        }`}></div>
+              {/* Thinking Indicator */}
+              {state === "thinking" && (
+                <div className="flex justify-start my-3">
+                   <div className="glass-card-sm px-5 py-4 rounded-3xl rounded-bl-sm flex items-center gap-3 bg-white/70 shadow-sm animate-fade-in border border-indigo-100">
+                      <div className="flex gap-1.5">
+                        <span className="text-lg animate-spin">⚙️</span>
+                      </div>
+                      <span className="text-[13px] font-bold text-indigo-500 uppercase tracking-widest">
+                        JARVIS is thinking...
+                      </span>
+                   </div>
+                </div>
+              )}
 
-        {/* Ring 3 Glow Foundation */}
-        <div className="absolute w-40 h-40 bg-cyan-500/10 blur-3xl rounded-full"></div>
+              <div ref={chatEndRef} className="h-6" />
+            </div>
+            
+            {/* Proper Bottom Action Dock */}
+            <div className="flex-none w-full bg-white/30 backdrop-blur-2xl border-t border-indigo-50/50 pt-3 pb-2 px-4 shadow-[0_-10px_30px_rgba(165,180,252,0.05)]">
+               
+               {/* Fixed Dock Row: Left Action | Center Mic | Right Action */}
+               <div className="flex justify-between items-center max-w-lg mx-auto mb-1">
+                 
+                 {/* Left: Clear Command */}
+                 <div className="flex-1 flex justify-start">
+                    {messages.length > 0 && state === "idle" ? (
+                      <button onClick={handleClear} className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:bg-white shadow-sm border border-slate-200 transition-all hover:scale-105 active:scale-95">
+                        ✕ Clear Output
+                      </button>
+                    ) : (
+                      <div className="w-[100px]"></div> /* Placeholder to balance flex */
+                    )}
+                 </div>
+                 
+                 {/* Center: Explicit Voice Orb placement */}
+                 <div className="flex-none flex items-center justify-center h-[110px] w-[110px]">
+                   <VoiceOrb state={state} onClick={handleMicClick} />
+                 </div>
+                 
+                 {/* Right: Interrupt / Stop Command */}
+                 <div className="flex-1 flex justify-end">
+                    {state === "speaking" ? (
+                      <button onClick={handleStop} className="bg-rose-50/90 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-bold text-rose-500 uppercase tracking-widest hover:bg-rose-100/90 shadow-sm border border-rose-200 transition-all hover:scale-105 active:scale-95 animate-pulse">
+                        ⏹ Interrupt
+                      </button>
+                    ) : (
+                      <div className="w-[100px]"></div> /* Placeholder to balance flex */
+                    )}
+                 </div>
 
-        {/* Center UI Core */}
-        <button
-          onClick={handleMicClick}
-          className={`relative z-10 flex items-center justify-center text-3xl shadow-[0_0_30px_rgba(0,240,255,0.4)] transition-all duration-500 w-28 h-28 rounded-full border border-cyan-400/30 ${
-            state === "listening" 
-              ? "animate-pulse bg-cyan-500/80 scale-105 shadow-[0_0_50px_rgba(0,240,255,0.6)]" 
-              : state === "thinking" 
-              ? "bg-purple-600/60 scale-95 shadow-[0_0_20px_rgba(168,85,247,0.5)]" 
-              : state === "speaking"
-              ? "bg-gradient-to-r from-cyan-500/80 to-emerald-400/80 animate-pulse shadow-[0_0_60px_rgba(0,240,255,0.6)] scale-110"
-              : state === "completed"
-              ? "animate-energy-pulse bg-cyan-400 shadow-[0_0_80px_rgba(0,240,255,0.8)]"
-              : "bg-gradient-to-r from-cyan-500/20 to-purple-500/20 hover:scale-105 hover:bg-cyan-500/30"
-          }`}
-        >
-          <span className="drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
-            {state === "idle" ? "🎤" : state === "listening" ? "🎧" : state === "thinking" ? "⚙️" : state === "completed" ? "✨" : "🔊"}
-          </span>
-        </button>
+               </div>
+               
+               {/* Chat Input Integrated into Dock */}
+               <div className="max-w-xl mx-auto align-bottom -mt-2">
+                 <ChatInput
+                    textInput={textInput}
+                    setTextInput={setTextInput}
+                    handleTextSubmit={handleTextSubmit}
+                    isDisabled={state !== "idle"}
+                 />
+               </div>
+
+            </div>
+          </main>
+        </div>
+
+        {/* Right Sidebar: Context & Actions */}
+        <div className="w-[320px] lg:w-[350px] flex-shrink-0 relative hidden md:block z-50">
+          <MetricsSidebar 
+             msgCount={jarvisMessages} 
+             imgCount={jarvisImages} 
+             sendPredefinedText={sendPredefinedText}
+             onOpenSettings={() => setIsSettingsOpen(true)}
+             onOpenHistory={() => setIsHistoryOpen(true)}
+          />
+        </div>
+
       </div>
-
-      {/* Floating Response Text Box (Pro Readability) */}
-      <div className="mt-10 max-w-sm w-full min-h-[4rem] z-10 flex flex-col items-center justify-start px-4">
-        {response ? (
-          <p className="text-cyan-100 text-center tracking-wide font-light text-lg 
-                        drop-shadow-[0_0_8px_rgba(0,255,255,0.6)] 
-                        bg-black/40 backdrop-blur-md rounded-xl p-4 
-                        border border-cyan-500/20 w-full animate-fade-in shadow-xl">
-            {response}
-          </p>
-        ) : (
-          <p className="text-cyan-500/50 text-center tracking-widest text-sm font-light mt-4">
-            AWAITING COMMAND
-          </p>
-        )}
-      </div>
-
     </div>
   );
 }

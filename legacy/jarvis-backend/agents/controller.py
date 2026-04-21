@@ -1,5 +1,5 @@
 """
-JARVIS-X — Agent Controller
+JARVIS — Agent Controller
 Orchestrates the full agentic pipeline: Plan → Execute → Reflect → Respond
 """
 
@@ -33,7 +33,7 @@ async def run_agent(user_input: str) -> str:
 
     # 2. Plan
     action_plan = await plan(user_input, memory_context=memory_context)
-    print(f"[JARVIS-X] Plan: {action_plan.get('intent', 'unknown')}")
+    print(f"[JARVIS] Plan: {action_plan.get('intent', 'unknown')}")
 
     # 3. Execute
     execution = await execute(action_plan, user_input)
@@ -45,14 +45,14 @@ async def run_agent(user_input: str) -> str:
         evaluation = await reflect(
             user_input, final_response, execution["results"]
         )
-        print(f"[JARVIS-X] Reflection: score={evaluation.get('quality_score')}, "
+        print(f"[JARVIS] Reflection: score={evaluation.get('quality_score')}, "
               f"complete={evaluation.get('is_complete')}")
 
         if evaluation.get("is_complete") and not evaluation.get("needs_retry"):
             break
 
         # Re-plan and re-execute
-        print(f"[JARVIS-X] Retrying (attempt {retries + 1})...")
+        print(f"[JARVIS] Retrying (attempt {retries + 1})...")
         feedback = evaluation.get("feedback", "")
         enhanced_input = f"{user_input}\n\n[Previous attempt feedback: {feedback}]"
         action_plan = await plan(enhanced_input, memory_context=memory_context)
@@ -67,3 +67,4 @@ async def run_agent(user_input: str) -> str:
         pass  # Memory storage is optional
 
     return final_response
+

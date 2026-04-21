@@ -28,3 +28,4 @@ def search_web(query: str, max_results: int = 3) -> str:
         return "\n\n".join(formatted)
     except Exception as e:
         return f"Web search failed: {e}"
+

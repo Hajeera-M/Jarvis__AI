@@ -54,3 +54,4 @@ def listen_and_transcribe() -> str:
     except Exception as e:
         print(f"[JARVIS] Transcription error: {e}")
         return ""
+

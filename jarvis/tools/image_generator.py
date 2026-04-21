@@ -54,3 +54,4 @@ if __name__ == "__main__":
         print(f"Success! Image saved to {path}")
     else:
         print(f"Error: {err}")
+

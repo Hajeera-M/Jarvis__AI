@@ -52,3 +52,4 @@ def write_file(args_json: str) -> str:
         return "Error: Input must be a valid JSON string with 'path' and 'content' keys."
     except Exception as e:
         return f"Failed to write file: {e}"
+

@@ -70,3 +70,4 @@ def plan(user_input: str, memory_context: str = "") -> dict:
             "steps": [{"action": "respond", "input": user_input, "reason": "Fallback plan due to parsing error"}]
         }
 
+

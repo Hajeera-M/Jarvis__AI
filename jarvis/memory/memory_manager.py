@@ -90,3 +90,4 @@ def get_contact_phone(name: str):
     query = "SELECT phone_number FROM contacts WHERE name = %s"
     res = execute_query(query, (name.lower(),), fetch=True)
     return res[0]['phone_number'] if res else None
+

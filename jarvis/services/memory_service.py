@@ -1,76 +1,80 @@
 """
 JARVIS — Memory Service
-Abstraction layer for database operations using SQLAlchemy sessions.
+Handles the triple-layer memory strategy: raw context (last 20 messages) and long-term summaries.
 """
 
-from contextlib import contextmanager
-from typing import List, Optional
-from jarvis.memory.postgres_db import SessionLocal, Conversation
-
-@contextmanager
-def get_db():
-    """
-    Context manager for safe database session handling.
-    Prevents memory leaks by ensuring the session is closed.
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from typing import List, Tuple, Dict, Any
+from jarvis.memory.postgres_db import SessionLocal, Conversation, MemorySummary
+from jarvis.models.groq_model import think as groq_reason
+from sqlalchemy import desc
 
 class MemoryService:
-    """
-    Service layer for conversation persistence and contextual memory.
-    """
+    @staticmethod
+    def get_context(user_id: str = "default_user", raw_limit: int = 20) -> str:
+        """
+        Retrieves recent context + long-term summaries.
+        """
+        db = SessionLocal()
+        
+        # 1. Fetch Latest Summary
+        summary = db.query(MemorySummary).filter(MemorySummary.user_id == user_id)\
+                    .order_by(desc(MemorySummary.last_processed_at)).first()
+        summary_text = summary.summary_text if summary else ""
+        
+        # 2. Fetch Raw Conversations (Last 20)
+        history = db.query(Conversation).filter(Conversation.user_id == user_id)\
+                    .order_by(desc(Conversation.timestamp)).limit(raw_limit).all()
+        history = list(reversed(history)) # Chronological order
+        
+        db.close()
+        
+        # 3. Format context string
+        context_str = f"LONG-TERM SUMMARY: {summary_text}\n\n" if summary_text else ""
+        for msg in history:
+            role_label = "User" if msg.role == "user" else "AI"
+            context_str += f"{role_label}: {msg.content}\n"
+            
+        return context_str
 
     @staticmethod
-    def save_interaction(user_id: str, user_msg: str, ai_resp: str) -> bool:
-        """
-        Saves a conversation turn to the database.
-        """
-        try:
-            with get_db() as db:
-                new_convo = Conversation(
-                    user_id=user_id,
-                    user_message=user_msg,
-                    ai_response=ai_resp
-                )
-                db.add(new_convo)
-                db.commit()
-                return True
-        except Exception as e:
-            print(f"[MemoryService Error] Save failed: {e}")
-            return False
+    def save_message(user_id: str, role: str, content: str):
+        """Saves a single message and triggers summarization if threshold met."""
+        db = SessionLocal()
+        new_msg = Conversation(user_id=user_id, role=role, content=content)
+        db.add(new_msg)
+        db.commit()
+        
+        # Check if summarization is needed (e.g., every 30 messages)
+        count = db.query(Conversation).filter(Conversation.user_id == user_id).count()
+        if count % 30 == 0 and count > 0:
+            MemoryService.summarize_history(user_id)
+            
+        db.close()
 
     @staticmethod
-    def get_recent_history(user_id: str, limit: int = 5) -> List[Conversation]:
-        """
-        Retrieves the last N interactions for a user to provide context to the LLM.
-        """
-        try:
-            with get_db() as db:
-                history = db.query(Conversation)\
-                    .filter(Conversation.user_id == user_id)\
-                    .order_by(Conversation.timestamp.desc())\
-                    .limit(limit)\
-                    .all()
-                # Return in chronological order for better LLM context
-                return list(reversed(history))
-        except Exception as e:
-            print(f"[MemoryService Error] History retrieval failed: {e}")
-            return []
+    def summarize_history(user_id: str):
+        """Compresses all BUT the most recent 20 messages into a new summary."""
+        db = SessionLocal()
+        
+        # Get all messages except the latest 20
+        all_msgs = db.query(Conversation).filter(Conversation.user_id == user_id)\
+                     .order_by(desc(Conversation.timestamp)).offset(20).all()
+        
+        if not all_msgs:
+            db.close()
+            return
 
-    @staticmethod
-    def clear_history(user_id: str) -> bool:
-        """
-        Wipes history for a user if requested (Siri-like privacy control).
-        """
-        try:
-            with get_db() as db:
-                db.query(Conversation).filter(Conversation.user_id == user_id).delete()
-                db.commit()
-                return True
-        except Exception as e:
-            print(f"[MemoryService Error] Wipe failed: {e}")
-            return False
+        text_to_summarize = "\n".join([f"{m.role}: {m.content}" for m in reversed(all_msgs)])
+        
+        # 1. Ask LLM to summarize
+        prompt = f"Summarize the following chat history into key facts and the current conversational state:\n\n{text_to_summarize}"
+        system_prompt = "You are a memory compression engine. Summarize precisely and briefly."
+        new_summary_text = groq_reason(prompt, system_prompt=system_prompt)
+        
+        if new_summary_text:
+            new_summary = MemorySummary(user_id=user_id, summary_text=new_summary_text)
+            db.add(new_summary)
+            db.commit()
+            
+        db.close()
+

@@ -1,74 +1,58 @@
-import requests
-import json
-import time
+"""Final E2E verification: Identity, Memory (Name Recall), Language, and TTS fallback."""
+import requests, time, os
 
-API_URL = "http://127.0.0.1:8000/jarvis"
-HEALTH_URL = "http://127.0.0.1:8000/health"
-USER_ID = "full_stack_verification_user"
+API = "http://127.0.0.1:8000/jarvis"
+HEALTH = "http://127.0.0.1:8000/health"
+USER = "e2e_test_user"
+results = []
 
-def test_jarvis():
-    print("--- 🚀 JARVIS-X Final Stack Verification ---")
-    
-    # 1. Health Check
-    print("[1] Checking Health Endpoint...")
-    try:
-        h = requests.get(HEALTH_URL)
-        print(f"Health Response: {h.json()}\n")
-    except Exception as e:
-        print(f"Health Check Failed: {e}\n")
+def check(name, condition, detail=""):
+    status = "✅ PASS" if condition else "❌ FAIL"
+    results.append(f"{status}: {name} {detail}")
 
-    # 2. Memory & Linguistic Persistence
-    print("[2] Setting Fact (Hindi/Hinglish)...")
-    payload1 = {
-        "input": "Mera naam Hajeera hai aur mujhe coding pasand hai.",
-        "user_id": USER_ID
-    }
-    r1 = requests.post(API_URL, json=payload1)
-    print(f"User: {payload1['input']}")
-    print(f"Assistant: {r1.json().get('response')}\n")
+# 1. Health
+try:
+    h = requests.get(HEALTH, timeout=5).json()
+    check("Health Endpoint", h.get("status") == "running")
+except:
+    check("Health Endpoint", False, "(server not reachable)")
 
-    time.sleep(2)
+# 2. Owner identity
+r = requests.post(API, json={"input": "Who is your owner?", "user_id": USER}).json()
+check("Owner Identity", "Hajeera" in r.get("response", ""), f"Response: {r.get('response','')[:80]}")
+print(f"   Owner Q: {r.get('response','')[:80]}")
 
-    print("[3] Recalling Fact (English)...")
-    payload2 = {
-        "input": "What is my name and what do I like?",
-        "user_id": USER_ID
-    }
-    r2 = requests.post(API_URL, json=payload2)
-    print(f"User: {payload2['input']}")
-    response = r2.json().get('response')
-    print(f"Assistant: {response}\n")
+time.sleep(1)
 
-    # 4. Agent Tool Routing (yfinance)
-    print("[4] Testing Stock Tool (yfinance)...")
-    payload3 = {
-        "input": "What is the price of Tesla stock?",
-        "user_id": USER_ID
-    }
-    r3 = requests.post(API_URL, json=payload3)
-    print(f"User: {payload3['input']}")
-    stock_res = r3.json()
-    print(f"Assistant: {stock_res.get('response')}")
-    print(f"Source: {stock_res.get('source')}\n")
+# 3. User name memory
+requests.post(API, json={"input": "My name is Sana.", "user_id": USER})
+time.sleep(1)
+r2 = requests.post(API, json={"input": "What is my name?", "user_id": USER}).json()
+check("User Name Recall", "Sana" in r2.get("response", ""), f"Response: {r2.get('response','')[:80]}")
+print(f"   Name recall: {r2.get('response','')[:80]}")
 
-    # 5. Success Verification
-    memory_success = "Hajeera" in response or "coding" in response.lower()
-    stock_success = stock_res.get("source") == "tool" and "Tesla" in stock_res.get("response")
+time.sleep(1)
 
-    if memory_success and stock_success:
-        print("✅ SUCCESS: Agent Routing & Memory are VERIFIED!")
-    else:
-        print(f"❌ FAILURE: Memory={memory_success}, Stock={stock_success}")
+# 4. Structured output format
+r3 = requests.post(API, json={"input": "Hello", "user_id": USER}).json()
+check("Structured Output - spoken_response", "spoken_response" in r3)
+check("Structured Output - voice", "voice" in r3)
+check("Structured Output - language", "language" in r3)
+check("Structured Output - source", "source" in r3)
 
-    # 6. Logging Check
-    if os.path.exists("jarvis_api.log"):
-        print("✅ SUCCESS: Production Logging is VERIFIED!")
-    else:
-        print("❌ FAILURE: Log file not found.")
+# 5. Stock tool routing
+r4 = requests.post(API, json={"input": "What is the price of Apple stock?", "user_id": USER}).json()
+check("Tool Routing - Stock", r4.get("source") == "tool", f"Source: {r4.get('source')}")
 
-if __name__ == "__main__":
-    import os
-    try:
-        test_jarvis()
-    except Exception as e:
-        print(f"Verification Error: {e}")
+# 6. Spoken response is shorter than full response
+resp = r4.get("response","")
+spoken = r4.get("spoken_response","")
+check("Speech Formatting (spoken shorter)", len(spoken) <= len(resp), f"full={len(resp)}, spoken={len(spoken)}")
+
+# 7. Log file exists
+check("Structured Logging Active", os.path.exists("jarvis_api.log"))
+
+print("\n--- JARVIS E2E Verification Results ---")
+for r in results:
+    print(r)
+

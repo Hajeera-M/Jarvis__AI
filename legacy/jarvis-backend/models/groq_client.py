@@ -1,5 +1,5 @@
 """
-JARVIS-X — Groq Client
+JARVIS — Groq Client
 Handles reasoning (LLM) and transcription (Whisper) via Groq API.
 """
 
@@ -53,3 +53,4 @@ async def transcribe(audio_bytes: bytes, filename: str = "audio.webm") -> str:
     )
 
     return response.strip() if isinstance(response, str) else response.text.strip()
+

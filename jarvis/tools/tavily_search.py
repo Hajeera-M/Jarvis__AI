@@ -25,3 +25,4 @@ def tavily_search(query):
     except Exception as e:
         print(f"[JARVIS Error] Tavily Search failed: {e}")
         return "Unable to fetch live data right now"
+

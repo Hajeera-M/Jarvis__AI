@@ -1,5 +1,5 @@
 """
-JARVIS-X — Speech-to-Text
+JARVIS — Speech-to-Text
 Uses Groq Whisper API to transcribe audio.
 """
 
@@ -22,3 +22,4 @@ async def transcribe_audio(audio_bytes: bytes, filename: str = "audio.webm") -> 
 
     transcript = await transcribe(audio_bytes, filename=filename)
     return transcript
+

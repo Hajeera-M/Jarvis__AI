@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-    title: "JARVIS-X | Voice AI Assistant",
+    title: "JARVIS | Voice AI Assistant",
     description:
-        "JARVIS-X — A voice-based agentic AI assistant powered by Groq reasoning and HuggingFace generation.",
+        "JARVIS — A voice-based agentic AI assistant powered by Groq reasoning and HuggingFace generation.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -17,3 +17,4 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </html>
     );
 }
+

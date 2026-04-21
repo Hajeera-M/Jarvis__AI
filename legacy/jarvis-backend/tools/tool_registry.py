@@ -1,5 +1,5 @@
 """
-JARVIS-X — Tool Registry
+JARVIS — Tool Registry
 Central mapping of tool names to their execution functions.
 """
 
@@ -45,3 +45,4 @@ async def execute_tool(tool_name: str, tool_input: str) -> str:
 
     else:
         return f"Unknown tool: {tool_name}"
+

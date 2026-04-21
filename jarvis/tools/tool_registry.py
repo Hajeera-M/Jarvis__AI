@@ -51,3 +51,4 @@ def call_tool(tool_name: str, tool_input: str) -> str:
             
     except Exception as e:
         return f"Error executing tool '{tool_name}': {e}"
+

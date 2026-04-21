@@ -7,3 +7,4 @@ def generate(prompt: str, system_prompt: str = "", temperature: float = 0.7, max
     print("[JARVIS] Using Groq for generation (HuggingFace bypassed)")
     return think(prompt, system_prompt, temperature)
 
+

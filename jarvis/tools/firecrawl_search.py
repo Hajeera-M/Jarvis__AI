@@ -60,3 +60,4 @@ def firecrawl_search(query):
     except Exception as e:
         print(f"[JARVIS Error] Firecrawl search failed: {e}")
         return "Unable to fetch live data right now due to a technical issue."
+

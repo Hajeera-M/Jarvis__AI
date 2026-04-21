@@ -1,5 +1,5 @@
 """
-JARVIS-X — Vector Store (Memory)
+JARVIS — Vector Store (Memory)
 ChromaDB-based memory for storing and retrieving conversation history.
 """
 
@@ -24,7 +24,7 @@ def _get_collection():
         ))
         _collection = _client.get_or_create_collection(
             name=CHROMA_COLLECTION_NAME,
-            metadata={"description": "JARVIS-X conversation memory"},
+            metadata={"description": "JARVIS conversation memory"},
         )
     return _collection
 
@@ -35,7 +35,7 @@ def store_interaction(user_message: str, ai_response: str) -> None:
     
     Args:
         user_message: What the user said
-        ai_response: What JARVIS-X responded
+        ai_response: What JARVIS responded
     """
     collection = _get_collection()
     
@@ -43,7 +43,7 @@ def store_interaction(user_message: str, ai_response: str) -> None:
     timestamp = datetime.now().isoformat()
     
     # Store as a combined document for better retrieval
-    document = f"User: {user_message}\nJARVIS-X: {ai_response}"
+    document = f"User: {user_message}\nJARVIS: {ai_response}"
     
     collection.add(
         ids=[doc_id],
@@ -88,3 +88,4 @@ def clear_memory() -> None:
     if _collection is not None:
         _client.delete_collection(CHROMA_COLLECTION_NAME)
         _collection = None
+

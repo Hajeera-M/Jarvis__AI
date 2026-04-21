@@ -1,5 +1,5 @@
 """
-JARVIS-X — Main FastAPI Server
+JARVIS — Main FastAPI Server
 Voice-based agentic AI assistant.
 """
 
@@ -17,7 +17,7 @@ from agents.controller import run_agent
 
 # ─── App ──────────────────────────────────────────────────────
 app = FastAPI(
-    title="JARVIS-X",
+    title="JARVIS",
     description="Voice-Based Agentic AI Assistant",
     version="1.0.0",
 )
@@ -44,7 +44,7 @@ class TextCommandResponse(BaseModel):
 # ─── Routes ───────────────────────────────────────────────────
 @app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "JARVIS-X"}
+    return {"status": "ok", "service": "JARVIS"}
 
 
 @app.post("/voice-command")
@@ -131,3 +131,4 @@ async def voice_command_full(audio: UploadFile = File(...)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

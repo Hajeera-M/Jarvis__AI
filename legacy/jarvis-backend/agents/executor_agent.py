@@ -1,12 +1,12 @@
 """
-JARVIS-X — Executor Agent
+JARVIS — Executor Agent
 Iterates over planned steps and dispatches to the appropriate tools.
 """
 
 from tools.tool_registry import execute_tool
 from models.huggingface_client import generate
 
-RESPONSE_SYSTEM_PROMPT = """You are JARVIS-X, an advanced AI assistant speaking to the user.
+RESPONSE_SYSTEM_PROMPT = """You are JARVIS, an advanced AI assistant speaking to the user.
 
 Generate a clear, concise, and helpful spoken response based on the provided context and information.
 
@@ -88,3 +88,4 @@ async def execute(plan: dict, user_input: str) -> dict:
         "results": results,
         "final_response": final_response,
     }
+

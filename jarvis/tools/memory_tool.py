@@ -39,3 +39,4 @@ def manage_memory(action: str, key: str, value: str = None) -> str:
             
     except Exception as e:
         return f"Memory tool error: {e}"
+

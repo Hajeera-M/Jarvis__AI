@@ -1,5 +1,5 @@
 """
-JARVIS-X Configuration
+JARVIS Configuration
 Loads environment variables and defines global settings.
 """
 
@@ -30,3 +30,4 @@ WAKE_WORD = "jarvis"
 # ─── File System Sandbox ─────────────────────────────────────
 SANDBOX_DIR = os.path.join(os.path.dirname(__file__), "sandbox")
 os.makedirs(SANDBOX_DIR, exist_ok=True)
+

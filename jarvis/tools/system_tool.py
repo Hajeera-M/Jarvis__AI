@@ -37,3 +37,4 @@ def open_url(url: str) -> str:
         return f"Successfully opened {url} in your default browser."
     except Exception as e:
         return f"Failed to open URL: {e}"
+
