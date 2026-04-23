@@ -66,7 +66,7 @@ def extract_image_prompt(text: str) -> str:
     return text
 
 
-DEMO_MODE = True  # Enforce stable behavior for presentation
+DEMO_MODE = False  # Enable full system functionality
 
 
 def canonicalize_output(text: str) -> str:
@@ -139,7 +139,7 @@ class MasterController:
             # Default to English-First logic
             lang = "en"
         
-        # 2. Fetch Identity Context (Owner: Hajeera vs. User: Sana)
+        # 2. Fetch Identity Context (Owner: Hajeera)
         owner_name = ProfileService.get_owner_identity()
         user_name = ProfileService.get_user_identity(user_id)
 
@@ -154,16 +154,43 @@ class MasterController:
 
         # 5. Agent Tool Routing Logic (Strict Priority)
 
+        # Priority 0: Native System Date & Time (High Priority Instant Bypass)
+        if any(word in query for word in ["date", "day", "today", "time", "current time", "local time"]):
+            date_val, time_val = ToolService.get_current_datetime()
+            response = f"Today is {date_val} and the current time is {time_val}."
+            
+            # Instant persistence and return (Bypass AI/Search)
+            MemoryService.save_message(user_id, "user", user_input)
+            MemoryService.save_message(user_id, "ai", response)
+            
+            output = {
+                "response": response,
+                "spoken_response": response,
+                "language": "en",
+                "source": "system",
+                "voice": "en-IN-Wavenet-B",
+                "image_url": "",
+                "status": "success"
+            }
+            context["last_tool"] = "system"
+            return output, context
+
         # Priority 1: Core Automation (Open/Close apps, search Youtube)
         if any(w in query for w in ["open active", "open google", "search google", "open youtube", "search youtube", "play on youtube", "play song", "open whatsapp", "send a message"]):
-            if DEMO_MODE:
-                response = "I'm sorry, that feature is currently under refinement. I'll be able to help with that very soon."
-                source = "ai"
-                status = "success"
+            if "youtube" in query:
+                target = query.replace("open youtube", "").replace("search youtube", "").replace("play on youtube", "").replace("play song", "").replace("search", "").strip()
+                response = AutomationService.play_youtube(target if target else "lofi beats")
+            elif "google" in query:
+                target = query.replace("open google", "").replace("search google", "").replace("search", "").strip()
+                response = AutomationService.search_google(target if target else "latest news")
+            elif "whatsapp" in query:
+                response = AutomationService.open_website("whatsapp")
             else:
-                response = "Automation features are currently being updated."
-                source = "ai"
-                status = "success"
+                target = query.replace("open", "").strip()
+                response = AutomationService.open_website(target)
+            
+            source = "automation"
+            status = "success"
             context["last_tool"] = "automation"
 
         # Priority 2: Image Generation Intent (STRICT)
@@ -242,7 +269,7 @@ class MasterController:
             context["last_tool"] = "currency"
 
         # Priority 6: Advanced Search & Real-time Live Topics (DuckDuckGo Scraper)
-        elif any(w in query for w in ["news", "latest update", "current state", "today", "happening", "current situation", "now in", "current affairs"]):
+        elif any(w in query for w in ["news", "latest update", "current state", "today", "happening", "current situation", "now in", "current affairs", "tell me about", "who is", "what is"]):
             if "what about" in query and last_topic:
                 search_term = query.replace("what about", "").strip()
                 combined_query = f"latest news {search_term or last_topic}"

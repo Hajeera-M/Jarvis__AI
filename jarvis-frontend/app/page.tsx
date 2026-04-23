@@ -2,14 +2,22 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AssistantHeader } from "./components/AssistantHeader";
-import { ChatMessage } from "./components/ChatMessage";
-import { VoiceOrb } from "./components/VoiceOrb";
-import { MetricsSidebar } from "./components/MetricsSidebar";
-import { ChatInput } from "./components/ChatInput";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  Plus, Database, History, User, Terminal, 
+  Settings, Mic, Square, Trash2, Globe, Cpu 
+} from "lucide-react";
+
+import dynamic from "next/dynamic";
 import { SettingsModal } from "./components/SettingsModal";
 import { HistoryModal } from "./components/HistoryModal";
+import { ChatMessage } from "./components/ChatMessage";
 import { initVoices, getPreferredVoice } from "../lib/voiceHelper";
+
+const ParticleGlobe = dynamic(() => import("./components/ParticleGlobe"), { 
+  ssr: false, 
+  loading: () => <div className="w-[420px] h-[420px] flex items-center justify-center text-cyan-500/20 tracking-widest text-[10px]">INITIALIZING CORE...</div>
+});
 
 interface ChatMessageObj {
   role: "user" | "jarvis";
@@ -24,169 +32,214 @@ export default function Home() {
   const [state, setState] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
   const [messages, setMessages] = useState<ChatMessageObj[]>([]);
   const [textInput, setTextInput] = useState("");
-  const [imageUrl, setImageUrl] = useState(""); // Kept for state compatibility
+  const [interimText, setInterimText] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
-
+  
   // Modal States
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isContinuous, setIsContinuous] = useState(true);
+  const recognitionRef = useRef<any>(null);
+  const isContinuousRef = useRef(true);
+  const processingRef = useRef(false);
 
-  // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, interimText]);
 
   useEffect(() => {
-    const savedMessages = localStorage.getItem("jarvis_messages");
-    if (savedMessages) {
+    const saved = localStorage.getItem("jarvis_messages");
+    if (saved) {
       try {
-        const parsed = JSON.parse(savedMessages);
-        const hydrated = parsed.map((m: any) => ({
-          ...m,
-          timestamp: new Date(m.timestamp)
-        }));
-        setMessages(hydrated);
-      } catch (e) {
-        console.error("Failed to load history:", e);
-      }
+        setMessages(JSON.parse(saved).map((m: any) => ({ ...m, timestamp: new Date(m.timestamp) })));
+      } catch (e) {}
     }
+    initVoices();
   }, []);
 
   useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem("jarvis_messages", JSON.stringify(messages));
-    }
+    if (messages.length > 0) localStorage.setItem("jarvis_messages", JSON.stringify(messages));
   }, [messages]);
 
-  // ─── Auth Guard ────────────────────────────────────────
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
   useEffect(() => {
-    const user = localStorage.getItem("jarvis_user");
-    if (!user) {
-      router.replace("/signin");
-    } else {
-      setAuthChecked(true);
-    }
-    // Initialize voices
-    initVoices();
+    if (!localStorage.getItem("jarvis_user")) router.replace("/signin");
+    else setAuthChecked(true);
   }, [router]);
 
-  // ─── API Call ───────────────────────────────────────────
-  async function sendToJarvis(text: string) {
+  async function processQuery(text: string) {
+    if (!text.trim()) return;
+    processingRef.current = true;
+    setMessages(prev => [...prev, { role: "user", text, timestamp: new Date() }]);
+    setState("thinking");
+    setInterimText("");
+
     try {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 12000); // 12s timeout for safety
+
       const res = await fetch("http://127.0.0.1:8000/jarvis", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ input: text }),
+        signal: controller.signal
       });
-      return await res.json();
-    } catch (e) {
-      console.error("JARVIS API Error:", e);
-      return { response: "Connection lost. Please try again.", status: "failed", source: "error" };
-    }
-  }
-
-  // ─── Process a query (shared by voice + text) ──────────
-  async function processQuery(text: string) {
-    if (!text.trim()) return;
-    // Add user message
-    setMessages((prev) => [...prev, { role: "user", text, timestamp: new Date() }]);
-    setState("thinking");
-    setImageUrl("");
-
-    const data = await sendToJarvis(text);
-    const reply = data.response || data.message || "No response received.";
-    const spokenReply = data.spoken_response || reply;
-    const source = data.source || "ai";
-    const imgUrl = data.image_url || "";
-    const status = data.status || "success";
-
-    // Add JARVIS message
-    setMessages((prev) => [
-      ...prev,
-      { role: "jarvis", text: reply, source, imageUrl: imgUrl, status, timestamp: new Date() },
-    ]);
-    setImageUrl(imgUrl);
-
-    // ─── TTS Stability Hardening ───────────────────────────
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel(); // Interrupt any ongoing speech immediately
+      clearTimeout(id);
+      const data = await res.json();
       
-      const speechText = data.spoken_response || reply; // Ensure full text source
-      const utterance = new SpeechSynthesisUtterance(speechText);
+      const reply = data.response || "System online. No change detected.";
+      const spoken = data.spoken_response || reply;
       
-      utterance.rate = 0.95; // Slightly slower for better professional clarity
-      utterance.pitch = 1.0;  // Natural pitch anchor
-      
-      const picked = getPreferredVoice(data.language || "en");
-      if (picked) utterance.voice = picked;
-      
-      utterance.onend = () => setState("idle");
-      utterance.onerror = () => setState("idle");
+      setMessages(prev => [...prev, { 
+        role: "jarvis", 
+        text: reply, 
+        source: data.source || "ai", 
+        imageUrl: data.image_url, 
+        status: data.status || "success", 
+        timestamp: new Date() 
+      }]);
 
-      setState("speaking");
-      // 200ms buffer delay allows the browser audio context to stabilize
-      setTimeout(() => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(spoken);
+        utterance.rate = 1.18; // Sharp, fast, professional
+        const voice = getPreferredVoice(data.language || "en");
+        if (voice) utterance.voice = voice;
+        
+        utterance.onstart = () => setState("speaking");
+        utterance.onend = () => {
+          setState("idle");
+          processingRef.current = false;
+          if (isContinuousRef.current) {
+            setTimeout(startListening, 300); // Resume listening after speaking
+          }
+        };
+        utterance.onerror = () => {
+          setState("idle");
+          processingRef.current = false;
+          if (isContinuousRef.current) setTimeout(startListening, 300);
+        };
+        
         window.speechSynthesis.speak(utterance);
-      }, 200);
-    } else {
-      setTimeout(() => setState("idle"), 2000);
+      } else {
+        setState("idle");
+        processingRef.current = false;
+        if (isContinuousRef.current) setTimeout(startListening, 300);
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.error("JARVIS: Request timed out.");
+        setMessages(prev => [...prev, { role: "jarvis", text: "I'm sorry, the request timed out. My communication link might be slow.", timestamp: new Date() }]);
+      } else {
+        console.error("JARVIS: Search/Automation Error:", err);
+      }
+      setState("idle");
+      processingRef.current = false;
+      if (isContinuousRef.current) setTimeout(startListening, 300);
     }
   }
 
-  // ─── Voice Mic Handler ─────────────────────────────────
-  const handleMicClick = () => {
-    // Instant interrupt
-    if (typeof window !== "undefined" && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
-    if (state === "speaking") {
-      setState("idle");
-      return;
-    }
-    if (state !== "idle") return;
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Speech recognition is not supported. Use Chrome or Edge.");
-      return;
+  const startListening = () => {
+    if (processingRef.current) return;
+    if (state === "listening") return;
+    
+    // Stop previous if exists
+    const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!Recognition) {
+        console.error("Critical: Speech Recognition API not supported in this browser.");
+        alert("Your browser does not support Speech Recognition. Please use Chrome or Edge.");
+        return;
     }
 
-    const recognition = new SpeechRecognition();
+    // Ensure we clear previous instance properly
+    if (recognitionRef.current) {
+        try { 
+            recognitionRef.current.onend = null;
+            recognitionRef.current.stop(); 
+        } catch(e) {}
+    }
+
+    const recognition = new Recognition();
     recognition.lang = "en-US";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    recognition.interimResults = true;
+    recognition.continuous = false; 
 
-    setState("listening");
-
-    recognition.onresult = async (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      processQuery(transcript);
+    recognition.onstart = () => {
+        console.log("JARVIS: Mic Link Active.");
+        setState("listening");
     };
 
-    recognition.onerror = () => {
+    recognition.onresult = (e: any) => {
+      const transcript = Array.from(e.results).map((r: any) => r[0].transcript).join("");
+      setInterimText(transcript);
+      if (e.results[0].isFinal) {
+          recognition.stop();
+          processQuery(transcript);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+            console.error("Speech Recognition Error:", event.error);
+        }
+        
+        if (isContinuousRef.current && !processingRef.current) {
+            setTimeout(startListening, 400);
+        }
+    };
+
+    recognition.onend = () => { 
+        if (!processingRef.current && isContinuousRef.current) {
+            setTimeout(startListening, 200);
+        } else if (!processingRef.current) {
+            setState("idle");
+        }
+    };
+    
+    recognitionRef.current = recognition;
+    try {
+        recognition.start();
+    } catch(e) {}
+  };
+
+  const handleMicClick = () => {
+    console.log("JARVIS: User triggered mic protocol.");
+    if (state === "speaking") {
+      window.speechSynthesis.cancel();
+      processingRef.current = false;
       setState("idle");
-    };
+      return;
+    }
+    
+    const nextContinuous = !isContinuous;
+    setIsContinuous(nextContinuous);
+    isContinuousRef.current = nextContinuous;
 
-    recognition.onend = () => {
-      setState((prev) => (prev === "listening" ? "idle" : prev));
-    };
-
-    recognition.onspeechend = () => recognition.stop();
-    recognition.start();
+    if (nextContinuous) {
+        // Request mic permission explicitly if needed
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(() => {
+                startListening();
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                }
+            })
+            .catch(err => {
+                console.error("Mic Permission Denied:", err);
+                setIsContinuous(false);
+                isContinuousRef.current = false;
+                alert("Microphone access is required for JARVIS. Please enable it in your browser settings.");
+            });
+    } else {
+        if (recognitionRef.current) {
+            recognitionRef.current.onend = null;
+            recognitionRef.current.stop();
+        }
+        setState("idle");
+    }
   };
 
-  // ─── Text Submit ───────────────────────────────────────
-  const handleTextSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!textInput.trim() || state !== "idle") return;
-    processQuery(textInput.trim());
-    setTextInput("");
-  };
-
-  // ─── Stop Speaking ─────────────────────────────────────
   const handleStop = () => {
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -194,140 +247,226 @@ export default function Home() {
     setState("idle");
   };
 
-  // ─── Clear Chat ────────────────────────────────────────
-  const handleClear = () => {
-    setMessages([]);
-    localStorage.removeItem("jarvis_messages");
-    setImageUrl("");
-    setState("idle");
-  };
-
-  const sendPredefinedText = (text: string) => {
-    if (state !== "idle") return;
-    processQuery(text);
-  };
-
-  // Metrics Logic
-  const jarvisMessages = messages.filter((m) => m.role === "jarvis").length;
-  const jarvisImages = messages.filter((m) => m.imageUrl && m.imageUrl !== "").length;
-
-  // Prevent flash of dashboard before redirect
   if (!authChecked) return null;
 
   return (
-    <div className="bg-jarvis min-h-screen flex justify-center p-4 lg:p-8">
-      
-      {/* Front-End Only Modals */}
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onClearMemory={handleClear} />
+    <div className="bg-[#050608] h-screen w-screen text-white font-mono selection:bg-cyan-500/30 overflow-hidden flex">
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} onClearMemory={() => setMessages([])} />
       <HistoryModal isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} messages={messages} />
 
-      {/* Structural constraint container */}
-      <div className="w-full max-w-7xl h-[calc(100vh-4rem)] flex gap-6">
-        
-        {/* Left/Center Panel: Main Interaction Area */}
-        <div className="flex-1 flex flex-col h-full relative border border-indigo-50/50 rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(165,180,252,0.1)]">
-          <div className="absolute inset-0 bg-white/40 backdrop-blur-3xl z-0 pointer-events-none"></div>
-          
-          <AssistantHeader state={state} />
+      {/* ─── LEFT DOCK ─────────────────────────────────────── */}
+      <nav className="w-20 border-r border-white/5 flex flex-col items-center py-8 gap-8 bg-black/40 backdrop-blur-xl">
+         <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-purple-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 mb-4">
+            <Cpu className="text-white w-6 h-6" />
+         </div>
+         
+         <div className="flex flex-col gap-6 flex-1">
+            <button title="Import Files" className="p-3 rounded-xl hover:bg-white/5 transition-colors group">
+               <Plus className="w-6 h-6 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+            </button>
+            <button title="Memory Access" className="p-3 rounded-xl hover:bg-white/5 transition-colors group">
+               <Database className="w-6 h-6 text-slate-400 group-hover:text-amber-400 transition-colors" />
+            </button>
+            <button title="System History" onClick={() => setIsHistoryOpen(true)} className="p-3 rounded-xl hover:bg-white/5 transition-colors group">
+               <History className="w-6 h-6 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+            </button>
+            <button title="User Profile" className="p-3 rounded-xl hover:bg-white/5 transition-colors group">
+               <User className="w-6 h-6 text-slate-400 group-hover:text-purple-400 transition-colors" />
+            </button>
+         </div>
 
-          {/* Main Chat Feed */}
-          <main className="flex-1 flex flex-col overflow-hidden relative z-10 w-full max-w-3xl mx-auto h-full">
+         <button onClick={() => setIsSettingsOpen(true)} className="p-3 rounded-xl hover:bg-white/5 transition-colors group">
+            <Settings className="w-6 h-6 text-slate-400 group-hover:text-white transition-colors" />
+         </button>
+      </nav>
+
+      {/* ─── MAIN VISUAL HUB ──────────────────────────────── */}
+      <main className="flex-1 flex flex-col relative overflow-hidden bg-[#050608] min-w-0">
+         {/* Futuristic Gradient & Noise Overlay */}
+         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(6,182,212,0.1)_0%,transparent_70%),radial-gradient(circle_at_0%_100%,rgba(139,92,246,0.05)_0%,transparent_50%)] pointer-events-none"></div>
+         
+         {/* Grid System */}
+         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none"></div>
+         
+         {/* Scanline Effect */}
+         <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[size:100%_2px,3px_100%]"></div>
+
+         {/* Header area */}
+         <div className="flex items-center justify-between px-12 py-6 relative z-10">
+            <div className="flex items-center gap-6">
+               <div>
+                  <h2 className="text-[10px] font-bold tracking-[0.4em] text-cyan-500/60 uppercase">Primary Core</h2>
+                  <h1 className="text-xl font-bold tracking-tighter text-white">SYSTEM_ACTIVE</h1>
+               </div>
+               <button 
+                onClick={() => document.documentElement.requestFullscreen()}
+                className="mt-2 p-2 rounded-lg border border-white/5 hover:bg-white/5 text-slate-500 hover:text-cyan-400 transition-all"
+                title="Enter Fullscreen"
+               >
+                <Globe size={16} />
+               </button>
+            </div>
+            <div className="flex items-center gap-4">
+               <div className="flex flex-col items-end">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Operator Identity</span>
+                  <span className="text-sm font-bold text-white tracking-wide">Hajeera</span>
+               </div>
+               <div className="w-10 h-10 rounded-full border border-white/10 p-0.5 shadow-xl shadow-purple-500/10 bg-black">
+                  <img src={`https://ui-avatars.com/api/?name=Hajeera&background=020617&color=00f2ff`} className="w-full h-full rounded-full object-cover" />
+               </div>
+            </div>
+         </div>
+
+         {/* 3D Central Visualization */}
+         <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+            <div className="relative w-[420px] h-[420px] z-50">
+               <ParticleGlobe state={state} />
+            </div>
             
-            <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 space-y-2 relative custom-scrollbar">
-              
-              {messages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full opacity-60 gap-4 pt-4 animate-fade-in text-center">
-                  <div className="text-5xl drop-shadow-sm mb-2" style={{color: "var(--accent-lavender)"}}>✧</div>
-                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-700">How can I help you today?</h2>
-                  <p className="text-xs font-semibold uppercase tracking-widest text-indigo-300">
-                    Voice • Image • Search • Stock
-                  </p>
-                </div>
-              )}
+            {/* HUD Rings */}
+            <div className="absolute w-[450px] h-[450px] border border-indigo-500/5 rounded-full pointer-events-none"></div>
+            <div className="absolute w-[600px] h-[600px] border border-white rounded-full pointer-events-none animate-spin-slow opacity-20"></div>
 
-              {/* Render Messages */}
-              {messages.map((msg, i) => (
-                <ChatMessage key={i} msg={msg} />
-              ))}
+            {/* Visual Voice Waveform (Active when listening/speaking) */}
+            <AnimatePresence>
+               {(state === 'listening' || state === 'speaking') && (
+                  <motion.div 
+                     initial={{ opacity: 0, scale: 0.8 }}
+                     animate={{ opacity: 1, scale: 1 }}
+                     exit={{ opacity: 0, scale: 0.8 }}
+                     className="absolute flex items-center gap-1 h-32 pointer-events-none"
+                  >
+                     {[...Array(12)].map((_, i) => (
+                        <motion.div
+                           key={i}
+                           animate={{ 
+                              height: [20, Math.random() * 80 + 20, 20],
+                              backgroundColor: state === 'listening' ? '#22d3ee' : '#8b5cf6'
+                           }}
+                           transition={{ 
+                              repeat: Infinity, 
+                              duration: 0.5 + Math.random() * 0.5,
+                              ease: "easeInOut"
+                           }}
+                           className="w-1 rounded-full shadow-[0_0_15px_rgba(34,211,238,0.5)]"
+                        />
+                     ))}
+                  </motion.div>
+               )}
+            </AnimatePresence>
+            
+            {/* Status Radar Overlay */}
+            <div className="absolute bottom-16 flex flex-col items-center gap-8">
+               <AnimatePresence mode="wait">
+                  <motion.div 
+                     key={state}
+                     initial={{ opacity: 0, y: 10 }}
+                     animate={{ opacity: 1, y: 0 }}
+                     exit={{ opacity: 0, y: -10 }}
+                     className="px-8 py-3 rounded-full border border-cyan-500/20 bg-black/40 backdrop-blur-xl flex items-center gap-4 shadow-2xl shadow-cyan-500/10"
+                  >
+                     <div className={`w-2.5 h-2.5 rounded-full shadow-[0_0_15px_rgba(0,242,255,0.8)] ${
+                        state === 'listening' ? 'bg-cyan-400 animate-pulse' : 
+                        state === 'thinking' ? 'bg-amber-400 animate-spin' : 
+                        state === 'speaking' ? 'bg-purple-400 scale-125' : 'bg-slate-600'
+                     }`}></div>
+                     <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-cyan-100">
+                        {state === 'idle' ? 'Jarvis Protocol Alpha' : `System is ${state}`}
+                     </span>
+                  </motion.div>
+               </AnimatePresence>
 
-              {/* Thinking Indicator */}
-              {state === "thinking" && (
-                <div className="flex justify-start my-3">
-                   <div className="glass-card-sm px-5 py-4 rounded-3xl rounded-bl-sm flex items-center gap-3 bg-white/70 shadow-sm animate-fade-in border border-indigo-100">
-                      <div className="flex gap-1.5">
-                        <span className="text-lg animate-spin">⚙️</span>
+               <div className="flex items-center gap-4">
+                  {state === 'idle' ? (
+                     <button onClick={handleMicClick} className="w-20 h-20 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-cyan-500/10 hover:border-cyan-500/30 transition-all group active:scale-95 shadow-2xl shadow-cyan-500/10">
+                        <Mic className="w-8 h-8 text-slate-400 group-hover:text-cyan-400" />
+                     </button>
+                  ) : (
+                     <button onClick={() => { if(state === 'speaking') handleStop(); else window.location.reload(); }} className="w-20 h-20 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center hover:bg-rose-500/20 transition-all active:scale-95 shadow-2xl shadow-rose-500/10">
+                        <Square className="w-6 h-6 text-rose-500 fill-rose-500" />
+                     </button>
+                  )}
+                  
+                  {isContinuous && (
+                      <div className="flex flex-col">
+                          <span className="text-[10px] text-cyan-500 font-bold tracking-widest uppercase">Live Link</span>
+                          <span className="text-[9px] text-cyan-500/40 font-bold uppercase">Always Listening</span>
                       </div>
-                      <span className="text-[13px] font-bold text-indigo-500 uppercase tracking-widest">
-                        JARVIS is thinking...
-                      </span>
-                   </div>
-                </div>
-              )}
-
-              <div ref={chatEndRef} className="h-6" />
+                  )}
+               </div>
             </div>
+         </div>
+      </main>
+
+      {/* ─── SYSTEM TRANSCRIPTION PANEL ───────────────────── */}
+      <aside className="w-[400px] shrink-0 border-l border-white/5 bg-black/20 backdrop-blur-3xl flex flex-col relative z-50">
+         <div className="p-8 border-b border-white/5">
+            <div className="flex items-center justify-between mb-2">
+               <h3 className="text-xs font-bold tracking-[0.3em] text-cyan-400 uppercase">Communications</h3>
+               <div className="flex gap-2">
+                  <button onClick={() => {localStorage.removeItem("jarvis_messages"); setMessages([]);}} className="p-1.5 hover:bg-white/5 rounded-md text-slate-500 hover:text-rose-400 transition-colors">
+                     <Trash2 size={14} />
+                  </button>
+               </div>
+            </div>
+            <h1 className="text-lg font-bold text-white tracking-tighter">System_Transcription</h1>
+         </div>
+
+         {/* Chat Feed */}
+         <div className="flex-1 overflow-y-auto px-6 space-y-6 custom-scrollbar scroll-smooth">
+            {messages.length === 0 && (
+               <div className="h-full flex flex-col items-center justify-center opacity-20 gap-4 text-center px-8">
+                  <Terminal size={40} className="text-cyan-500" />
+                  <p className="text-xs uppercase tracking-widest leading-loose text-slate-500">Waiting for encrypted signal data...</p>
+               </div>
+            )}
             
-            {/* Proper Bottom Action Dock */}
-            <div className="flex-none w-full bg-white/30 backdrop-blur-2xl border-t border-indigo-50/50 pt-3 pb-2 px-4 shadow-[0_-10px_30px_rgba(165,180,252,0.05)]">
-               
-               {/* Fixed Dock Row: Left Action | Center Mic | Right Action */}
-               <div className="flex justify-between items-center max-w-lg mx-auto mb-1">
-                 
-                 {/* Left: Clear Command */}
-                 <div className="flex-1 flex justify-start">
-                    {messages.length > 0 && state === "idle" ? (
-                      <button onClick={handleClear} className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-bold text-slate-500 uppercase tracking-widest hover:bg-white shadow-sm border border-slate-200 transition-all hover:scale-105 active:scale-95">
-                        ✕ Clear Output
-                      </button>
-                    ) : (
-                      <div className="w-[100px]"></div> /* Placeholder to balance flex */
-                    )}
-                 </div>
-                 
-                 {/* Center: Explicit Voice Orb placement */}
-                 <div className="flex-none flex items-center justify-center h-[110px] w-[110px]">
-                   <VoiceOrb state={state} onClick={handleMicClick} />
-                 </div>
-                 
-                 {/* Right: Interrupt / Stop Command */}
-                 <div className="flex-1 flex justify-end">
-                    {state === "speaking" ? (
-                      <button onClick={handleStop} className="bg-rose-50/90 backdrop-blur-md px-4 py-2 rounded-2xl text-[10px] font-bold text-rose-500 uppercase tracking-widest hover:bg-rose-100/90 shadow-sm border border-rose-200 transition-all hover:scale-105 active:scale-95 animate-pulse">
-                        ⏹ Interrupt
-                      </button>
-                    ) : (
-                      <div className="w-[100px]"></div> /* Placeholder to balance flex */
-                    )}
-                 </div>
-
+            {messages.map((msg, i) => (
+               <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                  <div className={`px-4 py-3 rounded-2xl text-[13px] leading-relaxed max-w-[90%] shadow-2xl ${
+                     msg.role === 'user' 
+                     ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-100 rounded-tr-none'
+                     : 'bg-white/5 border border-white/10 text-slate-300 rounded-tl-none font-sans'
+                  }`}>
+                     {msg.text}
+                     {msg.imageUrl && (
+                        <div className="mt-4 rounded-xl overflow-hidden border border-white/10 shadow-2xl">
+                           <img src={msg.imageUrl} alt="Generated" className="w-full h-auto" />
+                        </div>
+                     )}
+                  </div>
+                  <span className="text-[9px] uppercase tracking-tighter text-slate-600 mt-2">
+                     {msg.role === 'user' ? 'Operator' : 'Jarvis Core'} • {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                </div>
-               
-               {/* Chat Input Integrated into Dock */}
-               <div className="max-w-xl mx-auto align-bottom -mt-2">
-                 <ChatInput
-                    textInput={textInput}
-                    setTextInput={setTextInput}
-                    handleTextSubmit={handleTextSubmit}
-                    isDisabled={state !== "idle"}
-                 />
+            ))}
+
+            {interimText && (
+               <div className="flex flex-col items-end opacity-50">
+                  <div className="px-4 py-3 rounded-2xl bg-cyan-500/5 border border-dashed border-cyan-500/30 text-cyan-200 text-[13px] rounded-tr-none">
+                     {interimText}
+                  </div>
                </div>
+            )}
 
-            </div>
-          </main>
-        </div>
+            <div ref={chatEndRef} className="h-12" />
+         </div>
 
-        {/* Right Sidebar: Context & Actions */}
-        <div className="w-[320px] lg:w-[350px] flex-shrink-0 relative hidden md:block z-50">
-          <MetricsSidebar 
-             msgCount={jarvisMessages} 
-             imgCount={jarvisImages} 
-             sendPredefinedText={sendPredefinedText}
-             onOpenSettings={() => setIsSettingsOpen(true)}
-             onOpenHistory={() => setIsHistoryOpen(true)}
-          />
-        </div>
-
-      </div>
+         {/* Bottom Action Area */}
+         <div className="p-6 bg-black/40 border-t border-white/5">
+            <form onSubmit={(e) => { e.preventDefault(); if(textInput.trim()) processQuery(textInput); setTextInput(""); }} className="relative group">
+               <input 
+                  type="text" 
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder="TYPE_COMMAND_HERE..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-12 py-4 text-xs font-bold tracking-widest text-cyan-400 placeholder:text-slate-700 focus:outline-none focus:border-cyan-500/50 transition-all uppercase"
+               />
+               <Terminal className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700 group-focus-within:text-cyan-500 transition-colors" />
+            </form>
+         </div>
+      </aside>
     </div>
   );
 }
+

@@ -47,7 +47,7 @@ class STTService:
                     model="whisper-large-v3",
                     response_format="text",
                     # Context for better Indian accent/Hinglish recognition
-                    prompt="The user might speak in Indian English, Hindi, Urdu, or Hinglish. Names like Hajeera and Sana might be mentioned."
+                    prompt="The user might speak in Indian English, Hindi, Urdu, or Hinglish. Names like Hajeera might be mentioned."
                 )
             
 

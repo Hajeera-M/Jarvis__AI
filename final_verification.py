@@ -3,11 +3,11 @@ import requests, time, os
 
 API = "http://127.0.0.1:8000/jarvis"
 HEALTH = "http://127.0.0.1:8000/health"
-USER = "e2e_test_user"
+USER = "fresh_hajeera_verification_01"
 results = []
 
 def check(name, condition, detail=""):
-    status = "✅ PASS" if condition else "❌ FAIL"
+    status = "PASS" if condition else "FAIL"
     results.append(f"{status}: {name} {detail}")
 
 # 1. Health
@@ -25,10 +25,10 @@ print(f"   Owner Q: {r.get('response','')[:80]}")
 time.sleep(1)
 
 # 3. User name memory
-requests.post(API, json={"input": "My name is Sana.", "user_id": USER})
+requests.post(API, json={"input": "My name is Testing Agent.", "user_id": USER})
 time.sleep(1)
 r2 = requests.post(API, json={"input": "What is my name?", "user_id": USER}).json()
-check("User Name Recall", "Sana" in r2.get("response", ""), f"Response: {r2.get('response','')[:80]}")
+check("User Name Recall", "Testing Agent" in r2.get("response", ""), f"Response: {r2.get('response','')[:80]}")
 print(f"   Name recall: {r2.get('response','')[:80]}")
 
 time.sleep(1)

@@ -24,7 +24,7 @@ def _get_groq_client():
     return _groq_client
 
 
-def think(prompt: str, system_prompt: str = "", temperature: float = 0.7) -> str:
+def think(prompt: str, system_prompt: str = "", temperature: float = 0.7, model: str = None) -> str:
     """
     Send a reasoning/thinking request to Groq LLM.
     Used by the planner and reflection agents.
@@ -39,6 +39,7 @@ def think(prompt: str, system_prompt: str = "", temperature: float = 0.7) -> str
         Generated text string
     """
     client = _get_groq_client()
+    target_model = model or GROQ_REASONING_MODEL
 
     messages = []
     if system_prompt:
@@ -47,7 +48,7 @@ def think(prompt: str, system_prompt: str = "", temperature: float = 0.7) -> str
 
     try:
         response = client.chat.completions.create(
-            model=GROQ_REASONING_MODEL,
+            model=target_model,
             messages=messages,
             temperature=temperature,
             max_tokens=2048,

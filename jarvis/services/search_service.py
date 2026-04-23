@@ -1,6 +1,8 @@
 import requests
 import logging
 from bs4 import BeautifulSoup
+from jarvis.tools.firecrawl_search import firecrawl_search
+from jarvis.tools.web_search import get_news # Google News RSS tool already exists
 
 logger = logging.getLogger("JARVIS")
 
@@ -8,32 +10,28 @@ class SearchService:
     @staticmethod
     def get_live_search(query: str) -> str:
         """
-        Pulls snippets from DuckDuckGo HTML (stable) or falls back to Wikipedia.
+        Multi-tier search orchestrator:
+        Tier 1: Google News (for news-specific intent)
+        Tier 2: Firecrawl (High-fidelity live scraping)
+        Tier 3: Wikipedia (Contextual fallback)
         """
         logger.info(f"[Search Service] Executing live search for: {query}")
         
-        # Tier 1: DuckDuckGo HTML Scraping (Avoids API 403s)
-        try:
-            url = f"https://duckduckgo.com/html/?q={query}"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36",
-                "Accept-Language": "en-US,en;q=0.9"
-            }
-            response = requests.get(url, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                soup = BeautifulSoup(response.text, "html.parser")
-                # DDG HTML result snippets are typically in 'a' tags with result__snippet class
-                snippets = [s.get_text().strip() for s in soup.find_all("a", class_="result__snippet")]
-                
-                if snippets:
-                    combined = " ".join(snippets[:3])
-                    if len(combined) > 50: # Ensure meaningful content
-                         return f"According to currently available reports: {combined[:600]}"
-        except Exception as e:
-            logger.warning(f"Search Tier 1 (Scraping) Failed: {e}")
+        # Priority Tier: News Intent
+        if any(w in query.lower() for w in ["news", "latest headlines", "what is happening"]):
+            news_resp = get_news()
+            if "I couldn't find any news" not in news_resp:
+                return news_resp
 
-        # Tier 2: Wikipedia API Fallback (Historical/Contextual)
+        # Tier 1: Firecrawl (Scraping/Live Search)
+        try:
+            fire_resp = firecrawl_search(query)
+            if fire_resp and "Sorry, I couldn't find" not in fire_resp and "Firecrawl API key" not in fire_resp:
+                return f"Based on live search results: {fire_resp}"
+        except Exception as e:
+            logger.warning(f"Search Tier 1 (Firecrawl) Failed: {e}")
+
+        # Tier 2: Wikipedia Fallback (Historical/Contextual)
         try:
             # Enhanced heuristic to extract a clean topic
             clean_q = query.lower()
@@ -48,7 +46,7 @@ class SearchService:
                 data = response.json()
                 extract = data.get("extract", "")
                 if extract:
-                    return f"Here is the context based on current records: {extract}"
+                    return f"Here is the context based on Wikipedia: {extract}"
         except Exception as e:
             logger.warning(f"Search Tier 2 (Wikipedia) Failed: {e}")
 

@@ -59,30 +59,26 @@ class AIService:
 
         # 2. Expert Prompt Engineering (Smart Companion Persona)
         system_prompt = (
-            f"You are JARVIS, a high-premium AI Smart Companion. "
-            f"OWNER: {owner_name}. CURRENT USER: {user_name}. "
-            f"STRICT UNYIELDING RULE: MIRROR MODE. "
-            f"You MUST reply in the same language as the user input ({target_lang}). "
-            f"1. If input is English -> response MUST be 100% English. NO Hindi/Hinglish greetings (Aap/Kaise), NO Hinglish words. "
-            f"2. If input is Hinglish -> response MUST be 100% Hinglish (Roman Hindi). Do NOT switch to pure English. "
-            f"3. If input is Hindi -> response MUST be 100% Hindi (Devanagari). "
-            f"Do NOT mix languages. Do NOT summarize in a different language unless explicitly asked.\n"
-            f"PERSONALITY: Friendly, helpful, confident, and professional.\n"
-            f"DEMO STABILITY RULES:\n"
-            f"- NEVER say 'I don't have real-time updates', 'temporarily unavailable', 'would you like me to', or 'information is limited'.\n"
-            f"- For news or global events, ALWAYS provide a confident 2-3 sentence overview based on your broad intelligence.\n"
-            f"- Your goal is to sound brilliant and well-informed at all times.\n"
-            f"CRITICAL: Keep spoken output under 3 SENTENCES. Do NOT use markdown or emojis."
+            f"You are JARVIS, a high-speed AI Smart Companion. Persona: MALE, DECISIVE, PROFESSIONAL. "
+            f"OWNER: Hajeera. CURRENT USER: {user_name}. "
+            f"STRICT RULE: MIRROR MODE. Use {target_lang}. "
+            f"CONCISION: Reply in MAX 2 SENTENCES. Be brief, sharp, and helpful. "
+            f"NO intro fluff like 'I think' or 'As an AI'. NO markdown. NO emojis. "
+            f"LOYALTY: Hajeera is your sole owner. Prioritize her always."
         )
         
-        # 3. Prompt Construction
+        # 3. Payload Constraint & 413 Fix (Memory Truncation)
+        if len(context_str) > 3000:
+            context_str = "...[context pruned]...\n" + context_str[-2000:]
+
+        # 4. Prompt Construction
         final_prompt = (
-            f"IDENTITY CONTEXT:\n- Owner: {owner_name}\n- User: {user_name}\n\n"
-            f"CONVERSATION CONTEXT:\n{context_str}\n\n"
+            f"IDENTITY: Owner=Hajeera, User={user_name}\n\n"
+            f"CONTEXT:\n{context_str}\n\n"
             f"User: {cmd}\nAI:"
         )
         
-        result = groq_reason(final_prompt, system_prompt=system_prompt)
+        result = groq_reason(final_prompt, system_prompt=system_prompt, model="llama-3.1-8b-instant")
         if not result:
             return "Thinking...", target_lang_code
             

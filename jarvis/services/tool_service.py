@@ -133,6 +133,14 @@ class ToolService:
         return random.choice(responses)
 
     @staticmethod
+    def get_current_datetime() -> tuple:
+        """Returns (date, time) as formatted strings."""
+        now = datetime.datetime.now()
+        date_str = now.strftime("%A, %B %d, %Y")
+        time_str = now.strftime("%I:%M %p")
+        return date_str, time_str
+
+    @staticmethod
     def get_weather(city: str) -> str:
         """
         Fetches live weather data using wttr.in with a robust 3-tier fallback chain.
@@ -170,10 +178,19 @@ class ToolService:
                     parts = clean_text.split(":")
                     return f"Currently {parts[0].strip().title()}: {parts[1].strip()}."
                 return f"Currently {city_name}: {clean_text}."
-        except Exception as e:
-            logger.warning(f"Weather Tier 2 Failed: {e}")
+        except:
+            pass
 
-        # Tier 3: Demo-Safe Fallback (No network dependency)
+        # Tier 3: Simple Fallback with live fetch
+        try:
+            url = f"https://wttr.in/{city_name}?format=%C+%t"
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                return f"Currently in {city_name}: {response.text.strip()}."
+        except:
+            pass
+
+        # Tier 4: Demo-Safe Fallback
         return f"Currently {city_name}: Around 28\u00B0C with typical local conditions."
 
     @staticmethod

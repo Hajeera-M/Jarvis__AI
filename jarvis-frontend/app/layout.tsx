@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-    title: "JARVIS | Voice AI Assistant",
+    title: "JARVIS | Core Operator: Hajeera",
     description:
-        "JARVIS — A voice-based agentic AI assistant powered by Groq reasoning and HuggingFace generation.",
+        "JARVIS — Superior Agentic AI System. Authorized Operator: Hajeera.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

@@ -40,7 +40,10 @@ def firecrawl_search(query):
 
     try:
         # Search for the query and get the first result
-        result = app.search(query=query, limit=1)
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(app.search, query=query, limit=1)
+            result = future.result(timeout=10) # 10s hard timeout
 
         if result and "data" in result and len(result["data"]) > 0:
             content = result["data"][0].get("content", "")

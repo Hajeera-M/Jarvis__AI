@@ -9,37 +9,38 @@ let _cachedEnVoice: SpeechSynthesisVoice | null = null;
 let _cachedHiVoice: SpeechSynthesisVoice | null = null;
 let _voicesLoaded = false;
 
-function pickEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  // 1. Female Indian English
-  const femaleIN = voices.find(
-    (v) => v.lang.toLowerCase().startsWith("en-in") && v.name.toLowerCase().includes("female")
-  );
-  if (femaleIN) return femaleIN;
+const NEURAL_HINTS = ["neural", "natural", "google", "online", "aria", "guy", "male", "wavenet", "david", "mark"];
 
-  // 2. Any Indian English
-  const anyIN = voices.find((v) => v.lang.toLowerCase().startsWith("en-in"));
+function pickEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  const vList = voices.filter(v => v.lang.toLowerCase().startsWith("en"));
+  
+  // 1. High-Fidelity Neural/Natural (Male Preferred)
+  const neuralMale = vList.find(v => 
+    NEURAL_HINTS.some(h => v.name.toLowerCase().includes(h)) && 
+    (v.name.toLowerCase().includes("male") || v.name.toLowerCase().includes("guy") || v.name.toLowerCase().includes("david") || v.name.toLowerCase().includes("mark"))
+  );
+  if (neuralMale) return neuralMale;
+
+  // 2. Any High-Fidelity Neural
+  const neuralAny = vList.find(v => NEURAL_HINTS.some(h => v.name.toLowerCase().includes(h)));
+  if (neuralAny) return neuralAny;
+
+  // 3. Regional Male (Indian English)
+  const maleIN = vList.find(
+    (v) => v.lang.toLowerCase().startsWith("en-in") && (v.name.toLowerCase().includes("male") || v.name.toLowerCase().includes("guy"))
+  );
+  if (maleIN) return maleIN;
+
+  // 4. Any Indian English
+  const anyIN = vList.find((v) => v.lang.toLowerCase().startsWith("en-in"));
   if (anyIN) return anyIN;
 
-  // 3. Female British English
-  const femaleGB = voices.find(
-    (v) => v.lang.toLowerCase().startsWith("en-gb") && v.name.toLowerCase().includes("female")
-  );
-  if (femaleGB) return femaleGB;
+  // 5. Male British/US fallback
+  const anyMale = vList.find((v) => v.name.toLowerCase().includes("male") || v.name.toLowerCase().includes("guy"));
+  if (anyMale) return anyMale;
 
-  // 4. Female US English
-  const femaleUS = voices.find(
-    (v) => v.lang.toLowerCase().startsWith("en-us") && v.name.toLowerCase().includes("female")
-  );
-  if (femaleUS) return femaleUS;
-
-  // 5. Any Female English
-  const anyFemale = voices.find(
-    (v) => v.lang.toLowerCase().startsWith("en") && v.name.toLowerCase().includes("female")
-  );
-  if (anyFemale) return anyFemale;
-
-  // 6. Any English fallback
-  return voices.find((v) => v.lang.toLowerCase().startsWith("en")) ?? null;
+  // 6. Generic Fallback
+  return vList[0] || null;
 }
 
 function pickHindiVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
