@@ -70,6 +70,15 @@ export default function Home() {
 
   async function processQuery(text: string) {
     if (!text.trim()) return;
+    
+    // 1. Force stop and disable recognition before processing starts
+    if (recognitionRef.current) {
+        try {
+            recognitionRef.current.onend = null;
+            recognitionRef.current.stop();
+        } catch(e) {}
+    }
+    
     processingRef.current = true;
     setMessages(prev => [...prev, { role: "user", text, timestamp: new Date() }]);
     setState("thinking");
@@ -77,7 +86,7 @@ export default function Home() {
 
     try {
       const controller = new AbortController();
-      const id = setTimeout(() => controller.abort(), 12000); // 12s timeout for safety
+      const id = setTimeout(() => controller.abort(), 30000); // 30s timeout for safety
 
       const res = await fetch("http://127.0.0.1:8000/jarvis", {
         method: "POST",
@@ -111,21 +120,40 @@ export default function Home() {
         utterance.onend = () => {
           setState("idle");
           processingRef.current = false;
+          
+          if (data.source === "exit") {
+            setTimeout(() => {
+                window.close();
+                localStorage.removeItem("jarvis_user");
+                window.location.href = "/signin";
+            }, 500);
+            return;
+          }
+
+          // Only resume if we are STILL in continuous mode
           if (isContinuousRef.current) {
-            setTimeout(startListening, 300); // Resume listening after speaking
+            setTimeout(startListening, 600); // Increased buffer to avoid hearing trailing audio
           }
         };
         utterance.onerror = () => {
           setState("idle");
           processingRef.current = false;
-          if (isContinuousRef.current) setTimeout(startListening, 300);
+          if (isContinuousRef.current) setTimeout(startListening, 600);
         };
         
         window.speechSynthesis.speak(utterance);
       } else {
         setState("idle");
         processingRef.current = false;
-        if (isContinuousRef.current) setTimeout(startListening, 300);
+        
+        if (data.source === "exit") {
+          window.close();
+          localStorage.removeItem("jarvis_user");
+          window.location.href = "/signin";
+          return;
+        }
+
+        if (isContinuousRef.current) setTimeout(startListening, 600);
       }
     } catch (err: any) {
       if (err.name === 'AbortError') {
@@ -136,13 +164,13 @@ export default function Home() {
       }
       setState("idle");
       processingRef.current = false;
-      if (isContinuousRef.current) setTimeout(startListening, 300);
+      if (isContinuousRef.current) setTimeout(startListening, 600);
     }
   }
 
   const startListening = () => {
     if (processingRef.current) return;
-    if (state === "listening") return;
+    if (state === "listening" || state === "speaking" || state === "thinking") return;
     
     // Stop previous if exists
     const Recognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -180,12 +208,31 @@ export default function Home() {
     };
 
     recognition.onerror = (event: any) => {
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-            console.error("Speech Recognition Error:", event.error);
+        const error = event.error;
+        if (error !== 'no-speech' && error !== 'aborted') {
+            console.error("Speech Recognition Error:", error);
+        }
+        
+        // On network error, stop retrying — speech service is unavailable
+        if (error === 'network') {
+            console.error("JARVIS: Speech service network error. Retrying in 3s...");
+            setState("idle");
+            if (isContinuousRef.current && !processingRef.current) {
+                setTimeout(startListening, 3000);
+            }
+            return;
+        }
+        
+        if (error === 'not-allowed') {
+            console.error("JARVIS: Microphone permission denied.");
+            setIsContinuous(false);
+            isContinuousRef.current = false;
+            setState("idle");
+            return;
         }
         
         if (isContinuousRef.current && !processingRef.current) {
-            setTimeout(startListening, 400);
+            setTimeout(startListening, 500);
         }
     };
 
@@ -261,17 +308,8 @@ export default function Home() {
          </div>
          
          <div className="flex flex-col gap-6 flex-1">
-            <button title="Import Files" className="p-3 rounded-xl hover:bg-white/5 transition-colors group">
-               <Plus className="w-6 h-6 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-            </button>
-            <button title="Memory Access" className="p-3 rounded-xl hover:bg-white/5 transition-colors group">
-               <Database className="w-6 h-6 text-slate-400 group-hover:text-amber-400 transition-colors" />
-            </button>
             <button title="System History" onClick={() => setIsHistoryOpen(true)} className="p-3 rounded-xl hover:bg-white/5 transition-colors group">
                <History className="w-6 h-6 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-            </button>
-            <button title="User Profile" className="p-3 rounded-xl hover:bg-white/5 transition-colors group">
-               <User className="w-6 h-6 text-slate-400 group-hover:text-purple-400 transition-colors" />
             </button>
          </div>
 

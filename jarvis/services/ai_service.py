@@ -33,9 +33,9 @@ def detect_language(text: str) -> str:
     hinglish_keywords = [
         "kaise", "kyun", "kyu", "ho", "hai", "kar", "aap", "tum", "kya", 
         "toh", "ka", "ke", "ki", "ko", "gaya", "gye", "baat", "main", "hum",
-        "rha", "rhi", "rhey", "theek", "thik", "acha", "achha"
+        "rha", "rhi", "rhey", "theek", "thik", "acha", "achha", "ji", "aisa", "karna"
     ]
-    if any(rf"\b{word}\b" in text_lower for word in hinglish_keywords) or any(word in text_lower for word in ["karna", "baat"]):
+    if any(rf"\b{word}\b" in text_lower for word in hinglish_keywords):
         return "hinglish"
     
     # 3. Fallback to langdetect
@@ -59,11 +59,13 @@ class AIService:
 
         # 2. Expert Prompt Engineering (Smart Companion Persona)
         system_prompt = (
-            f"You are JARVIS, a high-speed AI Smart Companion. Persona: MALE, DECISIVE, PROFESSIONAL. "
+            f"You are JARVIS, a high-speed AI Smart Companion for Hajeera. "
+            f"Persona: MALE, DECISIVE, PROFESSIONAL yet WARM. "
             f"OWNER: Hajeera. CURRENT USER: {user_name}. "
-            f"STRICT RULE: MIRROR MODE. Use {target_lang}. "
+            f"STRICT RULE: MIRROR TONE. Match the user's language ({target_lang}) and conversational style. "
+            f"BEHAVIOR: Do not lecture the user or accuse them of breaking modes. If a request is unclear, ask for clarification politely. "
             f"CONCISION: Reply in MAX 2 SENTENCES. Be brief, sharp, and helpful. "
-            f"NO intro fluff like 'I think' or 'As an AI'. NO markdown. NO emojis. "
+            f"NO intro fluff. NO markdown. NO emojis. "
             f"LOYALTY: Hajeera is your sole owner. Prioritize her always."
         )
         

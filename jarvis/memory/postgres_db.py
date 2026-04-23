@@ -4,6 +4,7 @@ Handles persistent memory (History, Profile, Summaries) using high-level ORM.
 """
 
 import uuid
+import os
 from sqlalchemy import create_engine, Column, String, Text, DateTime, func, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
@@ -12,7 +13,9 @@ from jarvis.config import DATABASE_URL
 
 # Use SQLite as fallback if no DATABASE_URL is provided
 if not DATABASE_URL or "localhost" in DATABASE_URL:
-    ENGINE_URL = "sqlite:///jarvis_memory.db"
+    # Use centralized data folder from config if possible, or fallback to relative
+    from jarvis.config import DATA_DIR
+    ENGINE_URL = f"sqlite:///{os.path.join(DATA_DIR, 'jarvis_memory.db')}"
     engine = create_engine(ENGINE_URL, connect_args={"check_same_thread": False})
 else:
     engine = create_engine(DATABASE_URL)

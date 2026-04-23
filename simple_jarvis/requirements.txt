@@ -1,8 +1,0 @@
-SpeechRecognition
-pyttsx3
-deep-translator
-langdetect
-huggingface_hub
-python-dotenv
-Pillow
-pyaudio

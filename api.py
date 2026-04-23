@@ -13,6 +13,10 @@ import asyncio
 import logging
 import traceback
 import uuid
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Ensure the 'jarvis' folder is in the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -22,7 +26,15 @@ from jarvis.memory.postgres_db import init_db
 from jarvis.services.stt_service import STTService
 
 # 1. Structured Logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+os.makedirs("logs", exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join("logs", "latest_api.log")),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger("JARVIS")
 
 # Database initialization

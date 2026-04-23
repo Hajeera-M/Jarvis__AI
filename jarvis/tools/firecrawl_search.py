@@ -39,24 +39,26 @@ def firecrawl_search(query):
         return "Firecrawl API key is missing. Please add it to your .env file."
 
     try:
-        # Search for the query and get the first result
+        # Search for the query
         import concurrent.futures
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(app.search, query=query, limit=1)
-            result = future.result(timeout=10) # 10s hard timeout
+            future = executor.submit(app.search, query=query)
+            result = future.result(timeout=15)
 
-        if result and "data" in result and len(result["data"]) > 0:
-            content = result["data"][0].get("content", "")
-            
-            if not content:
-                # Fallback to description/metadata if content is empty
-                content = result["data"][0].get("description", "")
-            
-            if not content:
-                return "I found the page, but there was no readable content."
+        # Handle New SDK Structure (v4+) - result is an object with 'web' attribute
+        if hasattr(result, 'web') and result.web and len(result.web) > 0:
+            first_res = result.web[0]
+            # Try to get content, fallback to description
+            content = getattr(first_res, 'content', "") or getattr(first_res, 'description', "")
+            if content:
+                return clean_text(content)
 
-            # Final Clean: Speakable and concise
-            return clean_text(content)
+        # Handle Legacy SDK Structure - result is a dictionary with 'data'
+        if isinstance(result, dict) and "data" in result and len(result["data"]) > 0:
+            first_res = result["data"][0]
+            content = first_res.get("content", "") or first_res.get("description", "")
+            if content:
+                return clean_text(content)
 
         return "Sorry, I couldn't find any relevant real-time information."
 

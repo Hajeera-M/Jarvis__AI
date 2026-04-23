@@ -6,8 +6,8 @@ Loads environment variables and defines global settings.
 import os
 from dotenv import load_dotenv
 
-# Ensure .env is loaded from the correct directory
-env_path = os.path.join(os.path.dirname(__file__), ".env")
+# Load .env from project root (one level up from jarvis/)
+env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
 load_dotenv(env_path)
 
 # ─── API Keys ────────────────────────────────────────────────
@@ -28,6 +28,10 @@ HUGGINGFACE_MODEL = "mistralai/Mistral-7B-Instruct-v0.3"
 WAKE_WORD = "jarvis"
 
 # ─── File System Sandbox ─────────────────────────────────────
-SANDBOX_DIR = os.path.join(os.path.dirname(__file__), "sandbox")
+# Centralized data folder in project root
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+SANDBOX_DIR = os.path.join(DATA_DIR, "sandbox")
 os.makedirs(SANDBOX_DIR, exist_ok=True)
 
