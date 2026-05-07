@@ -27,13 +27,21 @@ class SearchService:
         try:
             fire_resp = firecrawl_search(query)
             if fire_resp and "Sorry, I couldn't find" not in fire_resp and "Firecrawl API key" not in fire_resp:
-                return f"Based on live search results: {fire_resp}"
+                # Use AI to synthesize the raw firecrawl response into a clean answer
+                from jarvis.services.ai_service import AIService
+                summary, _ = AIService.get_reasoning(
+                    f"Summarize this search data for the query '{query}': {fire_resp[:2000]}", 
+                    context_str="SEARCH_SYNTHESIS_MODE", 
+                    owner_name="Hajeera", 
+                    user_name="Hajeera"
+                )
+                return summary if summary else f"Based on live search results: {fire_resp[:300]}..."
         except Exception as e:
             logger.warning(f"Search Tier 1 (Firecrawl) Failed: {e}")
 
         # Tier 2: Wikipedia Fallback (Historical/Contextual)
         try:
-            # Enhanced heuristic to extract a clean topic
+            # ... existing wiki logic ...
             clean_q = query.lower()
             for noise in ["latest update on", "news regarding", "what is happening in", "tell me about", "what's going on in", "situation in", "is happening in"]:
                 clean_q = clean_q.replace(noise, "")
@@ -46,9 +54,16 @@ class SearchService:
                 data = response.json()
                 extract = data.get("extract", "")
                 if extract:
-                    return f"Here is the context based on Wikipedia: {extract}"
+                    # Synthesize Wikipedia too
+                    from jarvis.services.ai_service import AIService
+                    summary, _ = AIService.get_reasoning(
+                        f"Provide a concise summary based on this Wikipedia extract for '{topic}': {extract}", 
+                        context_str="WIKI_SYNTHESIS_MODE", 
+                        owner_name="Hajeera", 
+                        user_name="Hajeera"
+                    )
+                    return summary if summary else extract
         except Exception as e:
             logger.warning(f"Search Tier 2 (Wikipedia) Failed: {e}")
 
-        # Signal failure to controller for AI fallback
         return ""

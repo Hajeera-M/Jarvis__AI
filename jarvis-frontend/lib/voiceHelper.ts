@@ -44,17 +44,26 @@ function pickEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice 
 }
 
 function pickHindiVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  // 1. Female Hindi-IN
-  const femaleHI = voices.find(
-    (v) => v.lang.toLowerCase().startsWith("hi-in") && v.name.toLowerCase().includes("female")
+  const vList = voices.filter(v => v.lang.toLowerCase().startsWith("hi"));
+  
+  // 1. High-Fidelity Neural (Google/Microsoft Premium)
+  const premium = vList.find(v => 
+    v.name.includes("Google हिन्दी") || 
+    v.name.includes("Heera") || 
+    v.name.includes("Swara") ||
+    v.name.toLowerCase().includes("neural") ||
+    v.name.toLowerCase().includes("online")
   );
+  if (premium) return premium;
+
+  // 2. Any Female Hindi-IN
+  const femaleHI = vList.find(v => v.name.toLowerCase().includes("female"));
   if (femaleHI) return femaleHI;
 
-  // 2. Any Hindi-IN
-  const anyHI = voices.find((v) => v.lang.toLowerCase().startsWith("hi"));
-  if (anyHI) return anyHI;
+  // 3. Any Hindi-IN
+  if (vList.length > 0) return vList[0];
 
-  // 3. Fallback to Indian English if no Hindi available
+  // 4. Fallback to Indian English if no Hindi available
   return pickEnglishVoice(voices);
 }
 

@@ -6,6 +6,7 @@ Handles the triple-layer memory strategy: raw context (last 20 messages) and lon
 from typing import List, Tuple, Dict, Any
 from jarvis.memory.postgres_db import SessionLocal, Conversation, MemorySummary
 from jarvis.models.groq_model import think as groq_reason
+from jarvis.services.vector_service import VectorService
 from sqlalchemy import desc
 
 class MemoryService:
@@ -39,12 +40,16 @@ class MemoryService:
     @staticmethod
     def save_message(user_id: str, role: str, content: str):
         """Saves a single message and triggers summarization if threshold met."""
+        # 1. Relational Persistence
         db = SessionLocal()
         new_msg = Conversation(user_id=user_id, role=role, content=content)
         db.add(new_msg)
         db.commit()
         
-        # Check if summarization is needed (e.g., every 30 messages)
+        # 2. Semantic Persistence (Vector)
+        VectorService.add_memory(content, metadata={"role": role, "user_id": user_id})
+
+        # 3. Automatic Summarization Check
         count = db.query(Conversation).filter(Conversation.user_id == user_id).count()
         if count % 30 == 0 and count > 0:
             MemoryService.summarize_history(user_id)

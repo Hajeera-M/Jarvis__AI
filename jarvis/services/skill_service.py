@@ -21,10 +21,11 @@ from jarvis.tools.firecrawl_search import firecrawl_search
 logger = logging.getLogger("JARVIS")
 
 COUNTRY_TIME_OFFSETS = {
-    "us": -5, "usa": -5, "america": -5,
-    "uk": 0, "london": 0, "india": 5.5,
-    "saudi": 3, "mexico": -6, "dubai": 4,
-    "japan": 9, "australia": 10, "france": 1, "germany": 1,
+    "us": -5, "usa": -5, "america": -5, "new york": -5, "washington": -5,
+    "uk": 0, "london": 0, "greenwich": 0, "india": 5.5, "bangalore": 5.5, "mumbai": 5.5, "delhi": 5.5,
+    "saudi": 3, "riyadh": 3, "mexico": -6, "dubai": 4, "uae": 4,
+    "tokyo": 9, "japan": 9, "australia": 10, "sydney": 10, "france": 1, "paris": 1, "germany": 1, "berlin": 1,
+    "singapore": 8, "china": 8, "beijing": 8, "moscow": 3, "russia": 3
 }
 
 class SkillService:
@@ -84,20 +85,30 @@ class SkillService:
 
     @staticmethod
     def get_weather(city: str) -> str:
+        """Fetches live weather and returns a clean, spoken-friendly sentence."""
         city_name = (city or "Bangalore").strip().title()
         try:
-            url = f"https://wttr.in/{city_name}?format=3"
+            # Using format="%C+and+%t" for "Cloudy and +31°C"
+            url = f"https://wttr.in/{city_name}?format=%C+and+%t"
             response = requests.get(url, timeout=5)
             if response.status_code == 200:
-                return f"Currently in {city_name}: {response.text.strip()}."
-        except: pass
+                result = response.text.strip().replace("+", "")
+                # Clean up punctuation and return natural sentence
+                return f"Current weather in {city_name} is {result}."
+        except Exception as e:
+            logger.error(f"Weather Fetch Error: {e}")
         return f"I'm having trouble getting the weather for {city_name} right now."
 
     @staticmethod
-    def get_current_time(country: str = "india") -> str:
-        offset = COUNTRY_TIME_OFFSETS.get(country.lower(), 5.5)
-        target = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=offset)
-        return f"The current time in {country.title()} is {target.strftime('%I:%M %p')}."
+    def get_current_time(location: str = "india") -> str:
+        """Calculates current time for a given city or country based on UTC offsets."""
+        loc_low = location.lower().strip()
+        offset = COUNTRY_TIME_OFFSETS.get(loc_low, 5.5)
+        
+        utc_now = datetime.datetime.now(datetime.timezone.utc)
+        target = utc_now + datetime.timedelta(hours=offset)
+        
+        return f"The current time in {location.title()} is {target.strftime('%I:%M %p')}."
 
     # ─── AUTOMATION TOOLS ──────────────────────────────────────
     @staticmethod

@@ -38,17 +38,6 @@ def format_for_speech(text: str) -> str:
     text = re.sub(r'\n+', '. ', text)
     text = re.sub(r'\s+', ' ', text).strip()
     
-    # Shorten to ~200 chars for spoken output
-    if len(text) > 200:
-        sentences = text.split('. ')
-        spoken = ""
-        for s in sentences:
-            if len(spoken) + len(s) < 200:
-                spoken += s + ". "
-            else:
-                break
-        text = spoken.strip() if spoken.strip() else sentences[0][:200]
-    
     return text
 
 

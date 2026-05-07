@@ -9,6 +9,7 @@ export interface VoiceCommandResult {
     transcript: string;
     response: string;
     audioBlob: Blob | null;
+    imageUrl?: string;
 }
 
 /**
@@ -51,6 +52,7 @@ export async function sendVoiceCommand(
         transcript: data.transcript || "",
         response: data.response || "",
         audioBlob: responseAudioBlob,
+        imageUrl: data.image_url,
     };
 }
 

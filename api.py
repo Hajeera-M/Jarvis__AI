@@ -31,7 +31,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(os.path.join("logs", "latest_api.log")),
+        logging.FileHandler(os.path.join("logs", "latest_api.log"), encoding='utf-8'),
         logging.StreamHandler()
     ]
 )

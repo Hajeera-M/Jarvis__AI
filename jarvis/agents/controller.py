@@ -12,6 +12,9 @@ from jarvis.services.tts_service import TTSService
 from jarvis.services.skill_service import SkillService
 from jarvis.services.whatsapp_service import WhatsAppService
 from jarvis.services.search_service import SearchService
+from jarvis.services.vision_service import VisionService
+from jarvis.services.calendar_service import CalendarService
+from jarvis.services.vector_service import VectorService
 
 logger = logging.getLogger("JARVIS")
 
@@ -91,31 +94,32 @@ DEMO_MODE = False  # Enable full system functionality
 
 
 def canonicalize_output(text: str) -> str:
+    # ... (name replacements)
     replacements = {
-        "Hajira": "Hajeera",
-        "hajira": "Hajeera",
-        "Hajra": "Hajeera",
-        "hajra": "Hajeera",
-        "Agera": "Hajeera",
-        "agera": "Hajeera",
-        "Jira": "Hajeera",
-        "jira": "Hajeera",
-        "Hey Jira": "Hajeera",
-        "Age era": "Hajeera",
-        "Ageera": "Hajeera"
+        "Hajira": "Hajeera", "hajira": "Hajeera", "Hajra": "Hajeera", "hajra": "Hajeera",
+        "Agera": "Hajeera", "agera": "Hajeera", "Jira": "Hajeera", "jira": "Hajeera"
     }
     for wrong, correct in replacements.items():
         text = text.replace(wrong, correct)
+    
+    # Strip Emojis for safe logging/TTS (Optional guard)
+    import re
+    text = re.sub(r'[\U00010000-\U0010ffff]', '', text)
     return text
 
 def extract_city(query: str) -> str:
-    """Extracts city name from weather-related queries."""
-    for prep in ["in ", "of ", "at ", "for "]:
-        if prep in query:
-            # Take the last part after the preposition
-            parts = query.split(prep)
+    """Extracts city name from weather-related queries accurately."""
+    # Ensure we look for prepositions as whole words with spaces
+    for prep in [" in ", " of ", " at ", " for "]:
+        if prep in f" {query} ":
+            parts = query.split(prep.strip())
             if len(parts) > 1:
-                return parts[-1].strip("? .!").title()
+                # Take the last meaningful part
+                city = parts[-1].strip("? .!").title()
+                # Filter out common non-city words that might follow prepositions
+                if city.lower() in ["now", "today", "tonight", "this morning", "this afternoon"]:
+                    return ""
+                return city
     return ""
 
 def contains_devanagari(text: str) -> bool:
@@ -170,6 +174,17 @@ class MasterController:
         Returns: (output_dict, updated_context)
         """
         query = user_input.lower().strip()
+        
+        # 0. RESOLVE PRONOUNS (He, She, It, They, Them)
+        last_entity = context.get("last_entity", "")
+        if last_entity and any(p in f" {query} " for p in [" he ", " she ", " him ", " her ", " his ", " it "]):
+            # Simple heuristic replacement for follow-ups
+            resolved_query = query.replace(" he ", f" {last_entity} ").replace(" she ", f" {last_entity} ")
+            resolved_query = resolved_query.replace(" him ", f" {last_entity} ").replace(" her ", f" {last_entity} ")
+            resolved_query = resolved_query.replace(" it ", f" {last_entity} ")
+            logger.info(f"Resolved Pronoun: {query} -> {resolved_query}")
+            query = resolved_query
+
         response = ""
         source = "ai"
         image_url = ""
@@ -200,28 +215,6 @@ class MasterController:
         last_topic = context.get("last_topic", "")
 
         # 5. Agent Tool Routing Logic (Strict Priority)
-
-        # Priority 0: Native System Date & Time (High Priority Instant Bypass)
-        if any(word in query for word in ["date", "day", "today", "time", "current time", "local time"]):
-            date_val, time_val = SkillService.get_current_time("india"), "" # simplified for demo
-            response = date_val
-            
-            # Instant persistence and return (Bypass AI/Search)
-            MemoryService.save_message(user_id, "user", user_input)
-            MemoryService.save_message(user_id, "ai", response)
-            
-            output = {
-                "response": response,
-                "spoken_response": response,
-                "language": "en",
-                "source": "system",
-                "voice": "en-IN-Wavenet-B",
-                "image_url": "",
-                "status": "success"
-            }
-            context["last_tool"] = "system"
-            return output, context
-
         # Priority 0.5: Fast Greeting Bypass (Avoid LLM for just name triggers)
         # Robust check: remove common punctuation and whitespace
         clean_query = "".join(c for c in query if c.isalnum() or c.isspace()).strip()
@@ -250,6 +243,45 @@ class MasterController:
                 "spoken_response": response,
                 "language": "en",
                 "source": "exit",
+                "voice": "en-IN-Wavenet-B",
+                "image_url": "",
+                "status": "success"
+            }
+            return output, context
+
+        # Priority 0.7: Vision Intent (Screen Awareness)
+        if any(w in query for w in ["on my screen", "look at my screen", "read my screen", "what am i looking at", "what is this", "see this"]):
+            response = VisionService.analyze_screen("Describe what you see on my screen in detail.")
+            source = "vision"
+            status = "success"
+            
+            output = {
+                "response": response,
+                "spoken_response": response,
+                "language": "en",
+                "source": "vision",
+                "voice": "en-IN-Wavenet-B",
+                "image_url": "",
+                "status": "success"
+            }
+            return output, context
+            
+        # Priority 0.8: Calendar & Tasks
+        if any(w in query for w in ["calendar", "schedule", "appointment", "meeting", "reminder", "event"]):
+            if "add" in query or "schedule" in query:
+                # Basic parsing: "add [title] to calendar on [date]"
+                title = query.replace("add", "").replace("to calendar", "").replace("on", "").strip()
+                from datetime import datetime, timedelta
+                date_str = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+                response = CalendarService.add_event(title, date_str)
+            else:
+                response = CalendarService.get_upcoming_events()
+            
+            output = {
+                "response": response,
+                "spoken_response": response,
+                "language": "en",
+                "source": "calendar",
                 "voice": "en-IN-Wavenet-B",
                 "image_url": "",
                 "status": "success"
@@ -320,8 +352,13 @@ class MasterController:
                 return output, context
 
         # Priority 2: Image Generation Intent (STRICT)
-        elif is_image_request(query) or (last_tool == "image" and is_image_request(query)):
-            prompt = extract_image_prompt(query)
+        elif is_image_request(query) or (last_tool == "image" and is_image_request(query)) or (len(query.split()) == 1 and query in ["cat", "dog", "bird", "lion", "tiger", "robot", "car"]):
+            # Auto-expand single word objects to full image prompts
+            if len(query.split()) == 1:
+                prompt = f"Generate a high quality image of a {query}"
+            else:
+                prompt = extract_image_prompt(query)
+                
             if not prompt or len(prompt.strip()) < 2:
                 response = "I can certainly generate an image for you. What exactly would you like me to draw?"
                 source = "ai"
@@ -369,7 +406,7 @@ class MasterController:
                 source = "ai"
             context["last_tool"] = "image"
 
-        # Priority 3: Stock Price & Finance (Stricter matching via is_stock_query)
+        # Priority 2.7: Stock Price & Finance (Stricter matching via is_stock_query)
         elif MasterController.is_stock_query(query) and not any(w in query for w in ["convert", "rupees", "inr"]):
             response = SkillService.get_stock_price(user_input)
             source = "stock"
@@ -388,16 +425,46 @@ class MasterController:
                     except:
                         pass
 
-        # Priority 4: Weather (STRICT: Keyless live retrieval)
-        elif any(w in query for w in ["weather", "temperature", "climate", "forecast", "how cold", "how hot"]):
+        # Priority 3: Weather (STRICT: Keyless live retrieval)
+        elif any(w in query for w in ["weather", "temperature", "climate", "forecast", "how cold", "how hot", "rain", "snow"]):
             city = extract_city(query)
             if not city:
                 city = "Bangalore" # Professional demo default
             
             response = SkillService.get_weather(city)
             source = "weather"
-            status = "success" # Always success for demo reliability 
+            status = "success"
             context["last_tool"] = "weather"
+
+        # Priority 4: Native System Date & Time
+        elif any(word in query for word in ["time is it", "current time", "local time", "what time", "what date", "today's date", "what day is it"]):
+            location = "india"
+            # Extract location from query (e.g., "time in Tokyo")
+            for prep in [" in ", " of ", " at ", " for "]:
+                if prep in f" {query} ":
+                    parts = query.split(prep.strip())
+                    if len(parts) > 1:
+                        location = parts[-1].strip("? .!").lower()
+                        break
+            
+            response = SkillService.get_current_time(location)
+            
+            # Instant persistence and return (Bypass AI/Search)
+            MemoryService.save_message(user_id, "user", user_input)
+            MemoryService.save_message(user_id, "ai", response)
+            
+            output = {
+                "response": response,
+                "spoken_response": response,
+                "language": "en",
+                "source": "system",
+                "voice": "en-IN-Wavenet-B",
+                "image_url": "",
+                "status": "success"
+            }
+            context["last_tool"] = "system"
+            return output, context
+
 
         # Priority 5: Currency Conversion (Only for explicit conversions or stock follow-ups)
         elif any(w in query for w in ["convert", "into inr", "to inr"]) or (last_tool == "stock" and any(w in query for w in ["in rupees", "in inr"])):
@@ -473,8 +540,13 @@ class MasterController:
                     status = "success"
             context["last_tool"] = "file"
 
-        # Priority 8: General AI Fallback
-        else:
+        # 3. AI Reasoning Fallback
+        if not response:
+            # Inject Semantic Memories for better context
+            memories = VectorService.query_memory(user_input, n_results=3)
+            if memories:
+                context_str += "\nRELEVANT PAST MEMORIES:\n" + "\n".join([f"- {m}" for m in memories])
+            
             response, res_lang = AIService.get_reasoning(user_input, context_str, owner_name, user_name, target_lang_code=lang)
             lang = res_lang
             source = "ai"
@@ -506,6 +578,12 @@ class MasterController:
 
         # Context updates
         context["last_query"] = user_input
+        
+        # Update last entity if found (Simple Capitalization Heuristic)
+        import re
+        names = re.findall(r'([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)', user_input)
+        if names:
+            context["last_entity"] = names[0]
         
         return output, context
 
